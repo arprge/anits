@@ -16,7 +16,7 @@ use crate::api::RateLimitInfo;
 use crate::app::{
     ActiveModal, AppState, AuthField, FilterScope, FocusPane, Screen, SidebarItem, ToastLevel,
 };
-use crate::config::{ScoreFormatPreference, ThemePalette};
+use crate::config::{ANILIST_OAUTH_PIN, ScoreFormatPreference, ThemePalette};
 use crate::domain::{AnimeItem, LibraryStatus, MediaId, Point3Score, ScoreFormat, ScoreRaw};
 
 const SPINNER_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -325,7 +325,7 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
                 ),
             ]),
             None => Line::styled(
-                "Connect your AniList account using an OAuth2 Client ID and access token.",
+                format!("OAuth2 Client ID + access token. App Redirect URL: {ANILIST_OAUTH_PIN}"),
                 Style::default().fg(palette.muted),
             ),
         };
@@ -394,7 +394,7 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
                 spans.push(Span::styled("▏", Style::default().fg(palette.accent)));
             }
             spans.push(Span::styled(
-                "Paste access token from callback URL",
+                "Paste token or full callback URL",
                 Style::default().fg(palette.muted),
             ));
             Line::from(spans)
@@ -409,7 +409,7 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
         let step3_hint = if view.token.is_empty() {
             None
         } else {
-            Some(" Paste access token from callback URL ")
+            Some(" Token or full callback URL ")
         };
         render_auth_field_box(
             frame,
@@ -2311,7 +2311,7 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend());
         assert!(rendered.contains("Enter AniList Client ID (or set ANILIST_CLIENT_ID)"));
         assert!(rendered.contains("Enter Client ID to generate authorization link"));
-        assert!(rendered.contains("Paste access token from callback URL"));
+        assert!(rendered.contains("Paste token or full callback URL"));
         assert!(rendered.contains("Verifying token..."));
 
         let corner_cell = terminal.backend().buffer().cell((0, 0)).unwrap();

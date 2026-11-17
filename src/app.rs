@@ -19,8 +19,8 @@ use crate::cache::{
     save_library_snapshot,
 };
 use crate::config::{
-    AppConfig, AuthSession, ScoreFormatPreference, ThemePalette, cache_dir, oauth_url,
-    save_app_config, save_auth_session,
+    ANILIST_OAUTH_PIN, AppConfig, AuthSession, ScoreFormatPreference, ThemePalette, cache_dir,
+    oauth_url, save_app_config, save_auth_session,
 };
 use crate::domain::{
     AnimeItem, EntryId, LibraryCollection, LibraryEntry, LibraryStatus, MediaId, Point3Score,
@@ -1912,18 +1912,51 @@ fn submit_auth_form(auth: &mut AuthScreenState) -> Vec<AppCommand> {
         auth.error = Some("Client ID is required.".to_owned());
         return Vec::new();
     }
-    let token = auth.token.trim();
-    if token.is_empty() {
-        auth.error = Some("Access token is required.".to_owned());
+    let Some(token) = extract_access_token(&auth.token) else {
+        auth.error = Some(if auth.token.contains("error=") {
+            format!(
+                "AniList returned an OAuth error. Set the app's Redirect URL to {ANILIST_OAUTH_PIN} and try again."
+            )
+        } else {
+            "Access token is required.".to_owned()
+        });
         return Vec::new();
-    }
+    };
 
     auth.error = None;
     auth.submitting = true;
     vec![AppCommand::Authenticate {
         client_id: client_id.to_owned(),
-        token: token.to_owned(),
+        token,
     }]
+}
+
+/// Extracts an AniList access token from whatever the browser shows.
+///
+/// Accepts a bare JWT, a `Bearer ...` header value, or a full auth-pin
+/// callback URL containing `access_token=...`, so users can paste the
+/// callback URL instead of hunting for the token fragment.
+fn extract_access_token(input: &str) -> Option<String> {
+    let text = input.trim().trim_matches(|c| c == '"' || c == '\'');
+    if text.is_empty() {
+        return None;
+    }
+    if text.contains("error=") && !text.contains("access_token=") {
+        return None;
+    }
+    let candidate = match text.split_once("access_token=") {
+        Some((_, rest)) => rest.split(|c| c == '&' || c == '#').next().unwrap_or(rest),
+        None => text
+            .strip_prefix("Bearer ")
+            .or_else(|| text.strip_prefix("bearer "))
+            .unwrap_or(text),
+    };
+    let candidate = candidate.trim();
+    if candidate.is_empty() {
+        None
+    } else {
+        Some(candidate.to_owned())
+    }
 }
 
 enum PersistOp {
@@ -3203,6 +3236,60 @@ mod tests {
         assert!(ok_cmds
             .iter()
             .any(|c| matches!(c, AppCommand::FetchLibrary)));
+    }
+
+    #[test]
+    fn access_token_input_accepts_raw_headers_and_callback_urls() {
+        assert_eq!(extract_access_token("  eyJ.a.b  ").as_deref(), Some("eyJ.a.b"));
+        assert_eq!(extract_access_token("\"eyJ.a.b\"").as_deref(), Some("eyJ.a.b"));
+        assert_eq!(extract_access_token("Bearer eyJ.a.b").as_deref(), Some("eyJ.a.b"));
+        assert_eq!(extract_access_token("bearer eyJ.a.b").as_deref(), Some("eyJ.a.b"));
+        assert_eq!(
+            extract_access_token(
+                "https://anilist.co/api/v2/oauth/pin#access_token=eyJ.a.b&token_type=Bearer"
+            )
+            .as_deref(),
+            Some("eyJ.a.b")
+        );
+        assert_eq!(
+            extract_access_token("https://example.com/callback?access_token=eyJ.a.b").as_deref(),
+            Some("eyJ.a.b")
+        );
+        assert_eq!(extract_access_token("   "), None);
+        assert_eq!(
+            extract_access_token(
+                "https://anilist.co/api/v2/oauth/pin#error=unsupported_grant_type"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn auth_submit_extracts_token_from_callback_url_and_explains_grant_errors() {
+        let mut auth = AuthScreenState {
+            client_id: "123".to_owned(),
+            token: "https://anilist.co/api/v2/oauth/pin#access_token=secret-tok".to_owned(),
+            focused: AuthField::Token,
+            submitting: false,
+            error: None,
+        };
+
+        let cmds = submit_auth_form(&mut auth);
+        assert!(matches!(
+            cmds.as_slice(),
+            [AppCommand::Authenticate { client_id, token }]
+                if client_id == "123" && token == "secret-tok"
+        ));
+
+        auth.submitting = false;
+        auth.token = "https://anilist.co/api/v2/oauth/pin#error=unsupported_grant_type".to_owned();
+        let cmds = submit_auth_form(&mut auth);
+        assert!(cmds.is_empty());
+        assert!(!auth.submitting);
+        assert!(auth
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("Redirect URL")));
     }
 
     #[test]

@@ -173,7 +173,20 @@ impl AuthSession {
     }
 }
 
+/// AniList's copy/paste OAuth redirect.
+///
+/// This must be registered as the application's Redirect URL in the AniList
+/// developer settings. Pointing the client at a callback/token server can
+/// trigger `unsupported_grant_type`: the browser reaches that server's token
+/// endpoint without a `grant_type`.
+pub const ANILIST_OAUTH_PIN: &str = "https://anilist.co/api/v2/oauth/pin";
+
 /// Builds the AniList implicit-grant OAuth authorization URL.
+///
+/// `redirect_uri` is intentionally omitted: AniList rejects implicit-grant
+/// requests (`response_type=token`) with `unsupported_grant_type` when
+/// `redirect_uri` is passed in the query string, and instead redirects to the
+/// Redirect URL configured on the client (`ANILIST_OAUTH_PIN`).
 pub fn oauth_url(client_id: &str) -> Result<String, ConfigError> {
     let trimmed = client_id.trim();
     if trimmed.is_empty() {
@@ -841,6 +854,7 @@ mod tests {
             url,
             "https://anilist.co/api/v2/oauth/authorize?client_id=12345&response_type=token"
         );
+        assert_eq!(ANILIST_OAUTH_PIN, "https://anilist.co/api/v2/oauth/pin");
     }
 
     #[test]
