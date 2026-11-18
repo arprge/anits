@@ -227,10 +227,19 @@ fn contrast_fg_on(bg: Color, palette: ThemePalette) -> Color {
 }
 
 fn unfocused_highlight_style(palette: ThemePalette) -> Style {
+    // Transparent themes have no panel color to highlight with. Use the
+    // accent as an opaque selection background so the row stays readable
+    // over whatever the terminal is showing through.
+    if palette.background == Color::Reset || palette.surface == Color::Reset {
+        return Style::default()
+            .bg(palette.accent)
+            .fg(contrast_fg_on(palette.accent, palette))
+            .add_modifier(Modifier::BOLD);
+    }
     let base = Style::default()
         .fg(palette.accent)
         .add_modifier(Modifier::BOLD);
-    if palette.surface != Color::Reset && palette.surface != palette.background {
+    if palette.surface != palette.background {
         base.bg(palette.surface)
     } else {
         base
@@ -2957,5 +2966,13 @@ mod tests {
         assert!(lib_buf.contains("Loading...") || lib_buf.contains("No Cover"));
         assert!(lib_state.last_cover_area.width > 0);
         assert!(lib_state.last_cover_area.height > 0);
+    }
+
+    #[test]
+    fn transparent_theme_selection_stays_opaque_when_unfocused() {
+        let palette = ThemePalette::from_name("terminal");
+        let style = unfocused_highlight_style(palette);
+        assert_eq!(style.bg, Some(palette.accent));
+        assert_eq!(style.fg, Some(contrast_fg_on(palette.accent, palette)));
     }
 }
