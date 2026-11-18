@@ -464,12 +464,28 @@ impl ThemePalette {
     }
 
     /// Maps a configured theme name to its color palette, falling back to `anilist`.
+    ///
+    /// # Palette roles
+    ///
+    /// * `background` - base background
+    /// * `surface` - raised panel and chrome
+    /// * `text` - primary content
+    /// * `muted` - secondary text, hints, and labels
+    /// * `accent` - primary accent and selection background
+    /// * `secondary` - supporting accent
+    /// * `success` / `warning` / `error` - status colors
+    /// * `border` - dividers and outlines
+    ///
+    /// Colors are taken from each project's published palette. Where a
+    /// published swatch is unreadable on its own background, the hue is kept
+    /// and only the lightness is adjusted; those cases are called out below.
     #[must_use]
     pub fn from_name(name: &str) -> Self {
         match name.trim().to_ascii_lowercase().as_str() {
             "catppuccin-mocha" => Self {
+                // Catppuccin Mocha: base, surface0, subtext0, surface2; mauve/blue accents.
                 background: Color::Rgb(30, 30, 46),
-                surface: Color::Rgb(24, 24, 37),
+                surface: Color::Rgb(49, 50, 68),
                 text: Color::Rgb(205, 214, 244),
                 muted: Color::Rgb(166, 173, 200),
                 accent: Color::Rgb(203, 166, 247),
@@ -480,20 +496,23 @@ impl ThemePalette {
                 border: Color::Rgb(88, 91, 112),
             },
             "catppuccin-latte" => Self {
+                // Catppuccin Latte: base, surface0, subtext0, surface2; mauve/blue accents.
+                // Green and yellow are darkened for contrast on the light base.
                 background: Color::Rgb(239, 241, 245),
-                surface: Color::Rgb(230, 233, 239),
+                surface: Color::Rgb(204, 208, 218),
                 text: Color::Rgb(76, 79, 105),
                 muted: Color::Rgb(108, 111, 133),
                 accent: Color::Rgb(136, 57, 239),
                 secondary: Color::Rgb(30, 102, 245),
-                success: Color::Rgb(64, 160, 43),
-                warning: Color::Rgb(223, 142, 29),
+                success: Color::Rgb(47, 125, 31),
+                warning: Color::Rgb(154, 96, 0),
                 error: Color::Rgb(210, 15, 57),
                 border: Color::Rgb(172, 176, 190),
             },
             "catppuccin-frappe" => Self {
+                // Catppuccin Frappe: base, surface0, subtext0, surface2; mauve/blue accents.
                 background: Color::Rgb(48, 52, 70),
-                surface: Color::Rgb(41, 44, 60),
+                surface: Color::Rgb(65, 69, 89),
                 text: Color::Rgb(198, 208, 245),
                 muted: Color::Rgb(165, 173, 206),
                 accent: Color::Rgb(202, 158, 230),
@@ -504,8 +523,9 @@ impl ThemePalette {
                 border: Color::Rgb(98, 104, 128),
             },
             "catppuccin-macchiato" => Self {
+                // Catppuccin Macchiato: base, surface0, subtext0, surface2; mauve/blue accents.
                 background: Color::Rgb(36, 39, 58),
-                surface: Color::Rgb(30, 32, 48),
+                surface: Color::Rgb(54, 58, 79),
                 text: Color::Rgb(202, 211, 245),
                 muted: Color::Rgb(165, 173, 203),
                 accent: Color::Rgb(198, 160, 246),
@@ -516,11 +536,13 @@ impl ThemePalette {
                 border: Color::Rgb(91, 96, 120),
             },
             "gruvbox" => Self {
+                // Gruvbox dark: bg0, bg1, fg1, fg4, bg3; orange accent, blue secondary.
+                // Orange keeps the accent distinct from the yellow warning state.
                 background: Color::Rgb(40, 40, 40),
-                surface: Color::Rgb(50, 48, 47),
+                surface: Color::Rgb(60, 56, 54),
                 text: Color::Rgb(235, 219, 178),
                 muted: Color::Rgb(168, 153, 132),
-                accent: Color::Rgb(215, 153, 33),
+                accent: Color::Rgb(254, 128, 25),
                 secondary: Color::Rgb(131, 165, 152),
                 success: Color::Rgb(184, 187, 38),
                 warning: Color::Rgb(250, 189, 47),
@@ -528,6 +550,7 @@ impl ThemePalette {
                 border: Color::Rgb(102, 92, 84),
             },
             "nord" => Self {
+                // Nord: nord0, nord1, nord4, nord6, nord3; nord8 accent, nord9 secondary.
                 background: Color::Rgb(46, 52, 64),
                 surface: Color::Rgb(59, 66, 82),
                 text: Color::Rgb(236, 239, 244),
@@ -540,6 +563,8 @@ impl ThemePalette {
                 border: Color::Rgb(76, 86, 106),
             },
             "tokyo-night" => Self {
+                // Tokyo Night: night background, storm panel, terminal black border;
+                // blue accent, purple secondary.
                 background: Color::Rgb(26, 27, 38),
                 surface: Color::Rgb(36, 40, 59),
                 text: Color::Rgb(192, 202, 245),
@@ -552,10 +577,12 @@ impl ThemePalette {
                 border: Color::Rgb(65, 72, 104),
             },
             "dracula" => Self {
+                // Dracula: background, current line, comment border; purple accent, cyan secondary.
+                // #6272a4 is too dim for muted text, so it is lightened.
                 background: Color::Rgb(40, 42, 54),
                 surface: Color::Rgb(68, 71, 90),
                 text: Color::Rgb(248, 248, 242),
-                muted: Color::Rgb(98, 114, 164),
+                muted: Color::Rgb(155, 163, 199),
                 accent: Color::Rgb(189, 147, 249),
                 secondary: Color::Rgb(139, 233, 253),
                 success: Color::Rgb(80, 250, 123),
@@ -564,42 +591,48 @@ impl ThemePalette {
                 border: Color::Rgb(98, 114, 164),
             },
             "monokai" => Self {
+                // Monokai: background, panel, selection border; purple accent, cyan secondary.
+                // Purple keeps the accent distinct from the pink error state.
                 background: Color::Rgb(39, 40, 34),
-                surface: Color::Rgb(56, 56, 48),
+                surface: Color::Rgb(62, 61, 50),
                 text: Color::Rgb(248, 248, 242),
-                muted: Color::Rgb(117, 113, 94),
-                accent: Color::Rgb(249, 38, 114),
+                muted: Color::Rgb(168, 164, 148),
+                accent: Color::Rgb(174, 129, 255),
                 secondary: Color::Rgb(102, 217, 239),
                 success: Color::Rgb(166, 226, 46),
                 warning: Color::Rgb(230, 219, 116),
                 error: Color::Rgb(249, 38, 114),
-                border: Color::Rgb(90, 88, 76),
+                border: Color::Rgb(73, 72, 62),
             },
             "flexoki" => Self {
+                // Flexoki: black, base-950, base-500, base-700; blue accent, purple secondary.
                 background: Color::Rgb(16, 15, 15),
                 surface: Color::Rgb(28, 27, 26),
                 text: Color::Rgb(206, 205, 195),
                 muted: Color::Rgb(135, 133, 128),
-                accent: Color::Rgb(208, 162, 21),
-                secondary: Color::Rgb(67, 133, 190),
+                accent: Color::Rgb(67, 133, 190),
+                secondary: Color::Rgb(139, 126, 200),
                 success: Color::Rgb(135, 154, 57),
                 warning: Color::Rgb(218, 112, 44),
                 error: Color::Rgb(209, 77, 65),
-                border: Color::Rgb(64, 62, 60),
+                border: Color::Rgb(87, 86, 83),
             },
             "rose-pine" => Self {
+                // Rose Pine: base, surface, subtle, highlight med; iris accent, foam secondary.
+                // Success uses Moon pine (#3e8fb0), because base pine is too dark here.
                 background: Color::Rgb(25, 23, 36),
                 surface: Color::Rgb(31, 29, 46),
                 text: Color::Rgb(224, 222, 244),
                 muted: Color::Rgb(144, 140, 170),
                 accent: Color::Rgb(196, 167, 231),
                 secondary: Color::Rgb(156, 207, 216),
-                success: Color::Rgb(49, 116, 143),
+                success: Color::Rgb(62, 143, 176),
                 warning: Color::Rgb(246, 193, 119),
                 error: Color::Rgb(235, 111, 146),
                 border: Color::Rgb(64, 61, 82),
             },
             "rose-pine-moon" => Self {
+                // Rose Pine Moon: base, surface, subtle, highlight med; iris/foam accents.
                 background: Color::Rgb(35, 33, 54),
                 surface: Color::Rgb(42, 39, 63),
                 text: Color::Rgb(224, 222, 244),
@@ -612,34 +645,39 @@ impl ThemePalette {
                 border: Color::Rgb(68, 65, 90),
             },
             "rose-pine-dawn" => Self {
+                // Rose Pine Dawn: base, overlay, muted, highlight high; iris/foam accents.
+                // Gold and love are darkened for contrast on the light base.
                 background: Color::Rgb(250, 244, 237),
                 surface: Color::Rgb(242, 233, 225),
                 text: Color::Rgb(87, 82, 121),
-                muted: Color::Rgb(152, 147, 165),
+                muted: Color::Rgb(110, 106, 134),
                 accent: Color::Rgb(144, 122, 169),
-                secondary: Color::Rgb(86, 148, 159),
+                secondary: Color::Rgb(74, 131, 140),
                 success: Color::Rgb(40, 105, 131),
-                warning: Color::Rgb(234, 157, 52),
-                error: Color::Rgb(180, 99, 122),
-                border: Color::Rgb(215, 206, 199),
+                warning: Color::Rgb(154, 107, 15),
+                error: Color::Rgb(163, 74, 99),
+                border: Color::Rgb(206, 202, 205),
             },
             "solarized-light" => Self {
+                // Solarized Light: base3, base2, base1 border; blue accent, cyan secondary.
+                // Cyan, green, and yellow are darkened for contrast on the light base.
                 background: Color::Rgb(253, 246, 227),
                 surface: Color::Rgb(238, 232, 213),
-                text: Color::Rgb(101, 123, 131),
-                muted: Color::Rgb(147, 161, 161),
+                text: Color::Rgb(88, 110, 117),
+                muted: Color::Rgb(101, 123, 131),
                 accent: Color::Rgb(38, 139, 210),
-                secondary: Color::Rgb(42, 161, 152),
-                success: Color::Rgb(133, 153, 0),
-                warning: Color::Rgb(181, 137, 0),
+                secondary: Color::Rgb(31, 122, 115),
+                success: Color::Rgb(107, 125, 0),
+                warning: Color::Rgb(138, 103, 0),
                 error: Color::Rgb(220, 50, 47),
                 border: Color::Rgb(147, 161, 161),
             },
             "solarized-dark" => Self {
+                // Solarized Dark: base03, base02, base01 border; blue accent, cyan secondary.
                 background: Color::Rgb(0, 43, 54),
                 surface: Color::Rgb(7, 54, 66),
-                text: Color::Rgb(131, 148, 150),
-                muted: Color::Rgb(88, 110, 117),
+                text: Color::Rgb(147, 161, 161),
+                muted: Color::Rgb(131, 148, 150),
                 accent: Color::Rgb(38, 139, 210),
                 secondary: Color::Rgb(42, 161, 152),
                 success: Color::Rgb(133, 153, 0),
@@ -648,30 +686,34 @@ impl ThemePalette {
                 border: Color::Rgb(88, 110, 117),
             },
             "atom-one-dark" => Self {
+                // Atom One Dark: bg, bg-dark panel, fg, border; purple accent, blue secondary.
+                // The published comment color is too dim, so muted is lightened.
                 background: Color::Rgb(40, 44, 52),
                 surface: Color::Rgb(33, 37, 43),
                 text: Color::Rgb(171, 178, 191),
-                muted: Color::Rgb(92, 99, 112),
+                muted: Color::Rgb(133, 140, 153),
                 accent: Color::Rgb(198, 120, 221),
                 secondary: Color::Rgb(97, 175, 239),
                 success: Color::Rgb(152, 195, 121),
                 warning: Color::Rgb(229, 192, 123),
                 error: Color::Rgb(224, 108, 117),
-                border: Color::Rgb(62, 68, 81),
+                border: Color::Rgb(75, 82, 99),
             },
             "atom-one-light" => Self {
+                // Atom One Light: bg, surface, fg, border; purple accent, blue secondary.
                 background: Color::Rgb(250, 250, 250),
                 surface: Color::Rgb(240, 240, 241),
                 text: Color::Rgb(56, 58, 66),
-                muted: Color::Rgb(160, 161, 167),
+                muted: Color::Rgb(105, 108, 119),
                 accent: Color::Rgb(166, 38, 164),
                 secondary: Color::Rgb(64, 120, 242),
                 success: Color::Rgb(80, 161, 79),
                 warning: Color::Rgb(193, 132, 1),
                 error: Color::Rgb(228, 86, 73),
-                border: Color::Rgb(200, 200, 204),
+                border: Color::Rgb(208, 208, 211),
             },
             "textual-dark" => Self {
+                // Textual dark palette.
                 background: Color::Rgb(18, 18, 18),
                 surface: Color::Rgb(30, 30, 30),
                 text: Color::Rgb(224, 224, 224),
@@ -684,15 +726,17 @@ impl ThemePalette {
                 border: Color::Rgb(68, 68, 68),
             },
             "textual-light" => Self {
+                // Textual light palette.
+                // Status colors are darkened for contrast on the light background.
                 background: Color::Rgb(248, 249, 250),
                 surface: Color::Rgb(233, 236, 239),
                 text: Color::Rgb(33, 37, 41),
-                muted: Color::Rgb(108, 117, 125),
+                muted: Color::Rgb(92, 99, 106),
                 accent: Color::Rgb(0, 69, 120),
                 secondary: Color::Rgb(1, 120, 212),
-                success: Color::Rgb(78, 191, 113),
-                warning: Color::Rgb(255, 166, 43),
-                error: Color::Rgb(186, 60, 91),
+                success: Color::Rgb(46, 125, 79),
+                warning: Color::Rgb(154, 103, 0),
+                error: Color::Rgb(168, 50, 79),
                 border: Color::Rgb(173, 181, 189),
             },
             "terminal" | "transparent" | "ansi" | "textual-ansi" => Self {
@@ -708,13 +752,13 @@ impl ThemePalette {
                 background: Color::Reset,
                 surface: Color::Reset,
                 text: Color::Reset,
-                muted: Color::Indexed(243),
+                muted: Color::Indexed(244),
                 accent: Color::Cyan,
                 secondary: Color::Blue,
                 success: Color::Green,
                 warning: Color::Yellow,
                 error: Color::Red,
-                border: Color::Indexed(240),
+                border: Color::Indexed(242),
             },
             // Default: AniList dark palette
             _ => Self {
@@ -727,7 +771,7 @@ impl ThemePalette {
                 success: Color::Rgb(104, 214, 57),
                 warning: Color::Rgb(247, 154, 99),
                 error: Color::Rgb(232, 93, 117),
-                border: Color::Rgb(31, 45, 64),
+                border: Color::Rgb(42, 59, 82),
             },
         }
     }
@@ -929,8 +973,8 @@ mod tests {
         assert_eq!(terminal.text, Color::Reset);
         // Muted text and borders stay readable on both light and dark
         // terminal backgrounds (ANSI 7/8 are too theme-dependent).
-        assert_eq!(terminal.muted, Color::Indexed(243));
-        assert_eq!(terminal.border, Color::Indexed(240));
+        assert_eq!(terminal.muted, Color::Indexed(244));
+        assert_eq!(terminal.border, Color::Indexed(242));
         assert_eq!(terminal.accent, Color::Cyan);
         assert_eq!(terminal.secondary, Color::Blue);
         assert_eq!(ThemePalette::from_name("transparent"), terminal);
@@ -940,5 +984,114 @@ mod tests {
         assert_eq!(ThemePalette::next_theme_name("terminal"), "catppuccin-mocha");
         assert_eq!(ThemePalette::next_theme_name("dracula"), "anilist");
         assert_eq!(ThemePalette::display_name("terminal"), "Terminal (Transparent)");
+    }
+
+    fn relative_luminance(color: Color) -> Option<f64> {
+        let Color::Rgb(r, g, b) = color else {
+            return None;
+        };
+        fn channel(value: u8) -> f64 {
+            let value = f64::from(value) / 255.0;
+            if value <= 0.04045 {
+                value / 12.92
+            } else {
+                ((value + 0.055) / 1.055).powf(2.4)
+            }
+        }
+        Some(0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b))
+    }
+
+    fn contrast_ratio(a: Color, b: Color) -> Option<f64> {
+        let (a, b) = (relative_luminance(a)?, relative_luminance(b)?);
+        let (lighter, darker) = if a > b { (a, b) } else { (b, a) };
+        Some((lighter + 0.05) / (darker + 0.05))
+    }
+
+    #[test]
+    fn palettes_are_readable_and_semantically_distinct() {
+        const THEMES: &[&str] = &[
+            "anilist",
+            "catppuccin-mocha",
+            "catppuccin-latte",
+            "catppuccin-frappe",
+            "catppuccin-macchiato",
+            "gruvbox",
+            "nord",
+            "tokyo-night",
+            "dracula",
+            "monokai",
+            "flexoki",
+            "rose-pine",
+            "rose-pine-moon",
+            "rose-pine-dawn",
+            "solarized-light",
+            "solarized-dark",
+            "atom-one-dark",
+            "atom-one-light",
+            "textual-dark",
+            "textual-light",
+        ];
+        let fallback = ThemePalette::from_name("__unknown__");
+
+        for &theme in THEMES {
+            let palette = ThemePalette::from_name(theme);
+            if theme != DEFAULT_THEME {
+                assert_ne!(palette, fallback, "{theme}: unknown key fell back to AniList");
+            }
+
+            let contrast = |a: Color, b: Color| contrast_ratio(a, b).expect("RGB palette");
+            // WCAG AA: normal text needs 4.5:1 and UI/semantic accents 3:1.
+            assert!(
+                contrast(palette.text, palette.background) >= 4.5,
+                "{theme}: text is too dim"
+            );
+            assert!(
+                contrast(palette.muted, palette.background) >= 4.0,
+                "{theme}: muted text is too dim"
+            );
+            assert!(
+                contrast(palette.muted, palette.surface) >= 3.0,
+                "{theme}: muted text disappears on the panel surface"
+            );
+            // The accent doubles as the selection background, so the
+            // background color must stay readable when drawn on top of it.
+            assert!(
+                contrast(palette.background, palette.accent) >= 3.0,
+                "{theme}: selection text is too dim"
+            );
+            for (role, color) in [
+                ("secondary", palette.secondary),
+                ("success", palette.success),
+                ("warning", palette.warning),
+                ("error", palette.error),
+            ] {
+                assert!(
+                    contrast(color, palette.background) >= 3.0,
+                    "{theme}: {role} is too dim"
+                );
+            }
+
+            // A panel that matches the background disappears, and a border
+            // that merges into either surface stops separating regions.
+            assert!(
+                contrast(palette.surface, palette.background) >= 1.05,
+                "{theme}: surface does not stand out from the background"
+            );
+            assert_ne!(palette.surface, palette.background, "{theme}: surface matches background");
+            assert_ne!(palette.border, palette.background, "{theme}: border matches background");
+            assert_ne!(palette.border, palette.surface, "{theme}: border matches surface");
+            assert!(
+                contrast(palette.border, palette.background) >= 1.35,
+                "{theme}: border is invisible"
+            );
+
+            // Semantic roles must be distinguishable from each other and
+            // from the primary accent - otherwise status color is ambiguous.
+            assert_ne!(palette.muted, palette.text, "{theme}: muted duplicates text");
+            assert_ne!(palette.accent, palette.secondary, "{theme}: accent duplicates secondary");
+            assert_ne!(palette.accent, palette.error, "{theme}: accent duplicates error");
+            assert_ne!(palette.success, palette.warning, "{theme}: success duplicates warning");
+            assert_ne!(palette.warning, palette.error, "{theme}: warning duplicates error");
+        }
     }
 }
