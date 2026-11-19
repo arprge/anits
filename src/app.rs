@@ -339,6 +339,7 @@ pub struct AppState {
     pub focus: FocusPane,
     pub sidebar_index: usize,
     pub table_selected: usize,
+    pub table_offset: usize,
     pub filter_query: String,
     pub filter_active: bool,
     pub filter_scope: FilterScope,
@@ -410,6 +411,7 @@ impl AppState {
             focus: FocusPane::Table,
             sidebar_index: 0,
             table_selected: 0,
+            table_offset: 0,
             filter_query: String::new(),
             filter_active: false,
             filter_scope: FilterScope::CurrentList,
@@ -530,8 +532,12 @@ impl AppState {
 
         if self.visible_rows.is_empty() {
             self.table_selected = 0;
+            self.table_offset = 0;
         } else if self.table_selected >= self.visible_rows.len() {
             self.table_selected = self.visible_rows.len() - 1;
+        }
+        if self.table_selected == 0 {
+            self.table_offset = 0;
         }
     }
 
@@ -577,6 +583,7 @@ impl AppState {
                 self.active_status = LibraryStatus::Watching;
                 self.sidebar_index = 0;
                 self.table_selected = 0;
+                self.table_offset = 0;
                 self.filter_query.clear();
                 self.filter_active = false;
                 self.filter_scope = FilterScope::CurrentList;
@@ -1166,6 +1173,7 @@ impl AppState {
                 KeyCode::Char('g') | KeyCode::Home => {
                     if !self.visible_rows.is_empty() && self.table_selected != 0 {
                         self.table_selected = 0;
+                        self.table_offset = 0;
                         self.description_scroll = 0;
                         return self.ensure_covers_commands();
                     }
@@ -1519,6 +1527,7 @@ impl AppState {
         self.focus = FocusPane::Table;
         self.sidebar_index = 0;
         self.table_selected = 0;
+        self.table_offset = 0;
         self.filter_query.clear();
         self.filter_active = false;
         self.filter_scope = FilterScope::CurrentList;
@@ -1554,6 +1563,7 @@ impl AppState {
         self.library = LibraryCollection::default();
         self.visible_rows.clear();
         self.table_selected = 0;
+        self.table_offset = 0;
         self.description_scroll = 0;
         self.syncing = false;
         self.modal = ActiveModal::None;

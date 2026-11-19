@@ -101,6 +101,7 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
         Screen::Library => {
             let palette = state.palette;
             let score_format = state.effective_score_format();
+            let mut table_offset = state.table_offset;
             let (cover_target, selected_status, selected_score) = {
                 let mut counts = [0usize; 6];
                 let mut total_titles = 0usize;
@@ -160,11 +161,12 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
                     selected_item,
                 };
                 (
-                    render_library_base(frame, root, &view),
+                    render_library_base(frame, root, &view, &mut table_offset),
                     selected_status,
                     selected_score,
                 )
             };
+            state.table_offset = table_offset;
 
             if let Some((media_id, cover_area)) = cover_target {
                 if cover_area.width > 0 && cover_area.height > 0 {
@@ -566,6 +568,7 @@ fn render_library_base(
     frame: &mut Frame<'_>,
     root: Rect,
     view: &LibraryView<'_>,
+    table_offset: &mut usize,
 ) -> Option<(MediaId, Rect)> {
     let [top_area, body_area, footer_area] = if root.height >= 10 {
         Layout::vertical([
@@ -607,14 +610,15 @@ fn render_library_base(
             ])
             .areas(padded_body);
 
-            let cover_target = render_left_workspace(frame, root.width, content_area, view);
+            let cover_target =
+                render_left_workspace(frame, root.width, content_area, view, table_offset);
             render_sidebar(frame, sidebar_area, view);
             cover_target
         } else {
             let [strip_area, content_area] =
                 Layout::vertical([Constraint::Length(3), Constraint::Min(3)]).areas(padded_body);
             render_compact_strip(frame, strip_area, view);
-            render_left_workspace(frame, root.width, content_area, view)
+            render_left_workspace(frame, root.width, content_area, view, table_offset)
         }
     } else {
         None
@@ -629,6 +633,7 @@ fn render_left_workspace(
     total_width: u16,
     content_area: Rect,
     view: &LibraryView<'_>,
+    table_offset: &mut usize,
 ) -> Option<(MediaId, Rect)> {
     if content_area.width == 0 || content_area.height == 0 {
         return None;
@@ -644,7 +649,7 @@ fn render_left_workspace(
     .areas(content_area);
 
     let cover_target = render_details_base(frame, total_width, details_area, view);
-    render_anime_table(frame, table_area, view);
+    render_anime_table(frame, table_area, view, table_offset);
     cover_target
 }
 
@@ -1118,7 +1123,12 @@ enum TableLayoutMode {
     Compact,
 }
 
-fn render_anime_table(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
+fn render_anime_table(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    view: &LibraryView<'_>,
+    table_offset: &mut usize,
+) {
     if area.width == 0 || area.height == 0 {
         return;
     }
@@ -1286,7 +1296,9 @@ fn render_anime_table(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>)
     let selected = view
         .table_selected
         .min(view.visible_items.len().saturating_sub(1));
-    let mut table_state = TableState::default().with_selected(Some(selected));
+    let mut table_state = TableState::default()
+        .with_selected(Some(selected))
+        .with_offset(*table_offset);
 
     let highlight_style = if is_focused {
         Style::default()
@@ -1304,6 +1316,7 @@ fn render_anime_table(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>)
         .highlight_symbol("▌ ");
 
     frame.render_stateful_widget(table, inner, &mut table_state);
+    *table_offset = table_state.offset();
 }
 
 fn format_table_progress(item: &AnimeItem) -> String {
@@ -2385,11 +2398,12 @@ mod tests {
         };
 
         let mut cover_rect = None;
+        let mut table_offset = 0;
         terminal
             .draw(|f| {
                 let area = f.area();
                 fill_background(f, area, palette);
-                cover_rect = render_library_base(f, area, &view);
+                cover_rect = render_library_base(f, area, &view, &mut table_offset);
             })
             .unwrap();
 
@@ -2481,11 +2495,12 @@ mod tests {
         };
 
         let mut cover_rect = Some((item1.id, Rect::default()));
+        let mut table_offset = 0;
         terminal
             .draw(|f| {
                 let area = f.area();
                 fill_background(f, area, palette);
-                cover_rect = render_library_base(f, area, &view);
+                cover_rect = render_library_base(f, area, &view, &mut table_offset);
             })
             .unwrap();
 
@@ -2533,11 +2548,12 @@ mod tests {
             selected_item: None,
         };
 
+        let mut table_offset = 0;
         terminal
             .draw(|f| {
                 let area = f.area();
                 fill_background(f, area, palette);
-                render_library_base(f, area, &empty_view);
+                render_library_base(f, area, &empty_view, &mut table_offset);
             })
             .unwrap();
 
@@ -2555,7 +2571,7 @@ mod tests {
             .draw(|f| {
                 let area = f.area();
                 fill_background(f, area, palette);
-                render_library_base(f, area, &filtered_empty_view);
+                render_library_base(f, area, &filtered_empty_view, &mut table_offset);
             })
             .unwrap();
 
@@ -2897,11 +2913,12 @@ mod tests {
                 rating_input: "",
                 rating_input_error: None,
             };
+            let mut table_offset = 0;
             terminal
                 .draw(|f| {
                     let area = f.area();
                     fill_background(f, area, palette);
-                    render_library_base(f, area, &lib_view);
+                    render_library_base(f, area, &lib_view, &mut table_offset);
                     render_modal(f, area, &ActiveModal::Help, palette, &modal_ctx);
                 })
                 .unwrap();
@@ -2974,5 +2991,49 @@ mod tests {
         let style = unfocused_highlight_style(palette);
         assert_eq!(style.bg, Some(palette.accent));
         assert_eq!(style.fg, Some(contrast_fg_on(palette.accent, palette)));
+    }
+
+    #[test]
+    fn table_scroll_offset_persists_when_moving_up_from_bottom() {
+        let backend = TestBackend::new(100, 22);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let palette = ThemePalette::from_name("terminal");
+
+        let mut items = Vec::new();
+        for idx in 0..20 {
+            items.push(make_item(
+                1000 + idx,
+                &format!("Anime Title {idx:02}"),
+                None,
+                LibraryStatus::Watching,
+                1,
+                Some(12),
+                None,
+            ));
+        }
+        let mut lists = std::collections::HashMap::new();
+        lists.insert(LibraryStatus::Watching, items);
+        let library = crate::domain::LibraryCollection::from_lists(lists);
+
+        let auth = crate::config::AuthSession {
+            client_id: Some("123".to_owned()),
+            access_token: Some("tok".to_owned()),
+            username: Some("nkaet".to_owned()),
+        };
+        let mut state = AppState::new(palette, auth);
+        state.library = library;
+        state.rebuild_visible_rows();
+
+        // Scroll down past the bottom of the viewport.
+        state.table_selected = 14;
+        terminal.draw(|f| super::render(f, &mut state)).unwrap();
+        let offset_at_bottom = state.table_offset;
+        assert!(offset_at_bottom > 0, "table should have scrolled down");
+
+        // Pressing Up once should move the highlight up inside the viewport,
+        // keeping the scroll offset steady rather than pinning the cursor to the bottom.
+        state.table_selected = 13;
+        terminal.draw(|f| super::render(f, &mut state)).unwrap();
+        assert_eq!(state.table_offset, offset_at_bottom);
     }
 }

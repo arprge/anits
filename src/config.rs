@@ -476,77 +476,75 @@ impl ThemePalette {
     /// * `success` / `warning` / `error` - status colors
     /// * `border` - dividers and outlines
     ///
-    /// Colors are taken from each project's published palette. Where a
-    /// published swatch is unreadable on its own background, the hue is kept
-    /// and only the lightness is adjusted; those cases are called out below.
+    /// Colors are adapted from each project's palette with softened saturation
+    /// so accents, selection bars, and status indicators stay calm and readable
+    /// across large TUI surfaces while preserving WCAG AA contrast.
     #[must_use]
     pub fn from_name(name: &str) -> Self {
         match name.trim().to_ascii_lowercase().as_str() {
             "catppuccin-mocha" => Self {
-                // Catppuccin Mocha: base, surface0, subtext0, surface2; mauve/blue accents.
+                // Catppuccin Mocha: base, surface0, subtext0, surface2; softened mauve/blue accents.
                 background: Color::Rgb(30, 30, 46),
                 surface: Color::Rgb(49, 50, 68),
-                text: Color::Rgb(205, 214, 244),
-                muted: Color::Rgb(166, 173, 200),
-                accent: Color::Rgb(203, 166, 247),
-                secondary: Color::Rgb(137, 180, 250),
-                success: Color::Rgb(166, 227, 161),
-                warning: Color::Rgb(249, 226, 175),
-                error: Color::Rgb(243, 139, 168),
+                text: Color::Rgb(215, 220, 234),
+                muted: Color::Rgb(167, 174, 199),
+                accent: Color::Rgb(205, 185, 228),
+                secondary: Color::Rgb(169, 188, 218),
+                success: Color::Rgb(172, 220, 168),
+                warning: Color::Rgb(231, 219, 193),
+                error: Color::Rgb(220, 162, 178),
                 border: Color::Rgb(88, 91, 112),
             },
             "catppuccin-latte" => Self {
-                // Catppuccin Latte: base, surface0, subtext0, surface2; mauve/blue accents.
-                // Green and yellow are darkened for contrast on the light base.
+                // Catppuccin Latte: base, surface0, subtext0, surface2; softened mauve/blue accents.
                 background: Color::Rgb(239, 241, 245),
                 surface: Color::Rgb(204, 208, 218),
                 text: Color::Rgb(76, 79, 105),
                 muted: Color::Rgb(108, 111, 133),
-                accent: Color::Rgb(136, 57, 239),
-                secondary: Color::Rgb(30, 102, 245),
-                success: Color::Rgb(47, 125, 31),
-                warning: Color::Rgb(154, 96, 0),
-                error: Color::Rgb(210, 15, 57),
+                accent: Color::Rgb(142, 100, 196),
+                secondary: Color::Rgb(90, 122, 184),
+                success: Color::Rgb(56, 111, 45),
+                warning: Color::Rgb(112, 86, 42),
+                error: Color::Rgb(163, 62, 84),
                 border: Color::Rgb(172, 176, 190),
             },
             "catppuccin-frappe" => Self {
-                // Catppuccin Frappe: base, surface0, subtext0, surface2; mauve/blue accents.
+                // Catppuccin Frappe: base, surface0, subtext0, surface2; softened mauve/blue accents.
                 background: Color::Rgb(48, 52, 70),
                 surface: Color::Rgb(65, 69, 89),
-                text: Color::Rgb(198, 208, 245),
-                muted: Color::Rgb(165, 173, 206),
-                accent: Color::Rgb(202, 158, 230),
-                secondary: Color::Rgb(140, 170, 238),
-                success: Color::Rgb(166, 209, 137),
-                warning: Color::Rgb(229, 200, 144),
-                error: Color::Rgb(231, 130, 132),
+                text: Color::Rgb(211, 216, 232),
+                muted: Color::Rgb(170, 176, 201),
+                accent: Color::Rgb(200, 167, 221),
+                secondary: Color::Rgb(163, 179, 215),
+                success: Color::Rgb(166, 207, 139),
+                warning: Color::Rgb(217, 196, 156),
+                error: Color::Rgb(214, 147, 148),
                 border: Color::Rgb(98, 104, 128),
             },
             "catppuccin-macchiato" => Self {
-                // Catppuccin Macchiato: base, surface0, subtext0, surface2; mauve/blue accents.
+                // Catppuccin Macchiato: base, surface0, subtext0, surface2; softened mauve/blue accents.
                 background: Color::Rgb(36, 39, 58),
                 surface: Color::Rgb(54, 58, 79),
-                text: Color::Rgb(202, 211, 245),
-                muted: Color::Rgb(165, 173, 203),
-                accent: Color::Rgb(198, 160, 246),
-                secondary: Color::Rgb(138, 173, 244),
-                success: Color::Rgb(166, 218, 149),
-                warning: Color::Rgb(238, 212, 159),
-                error: Color::Rgb(237, 135, 150),
+                text: Color::Rgb(214, 218, 233),
+                muted: Color::Rgb(168, 175, 200),
+                accent: Color::Rgb(200, 180, 226),
+                secondary: Color::Rgb(165, 182, 217),
+                success: Color::Rgb(168, 214, 153),
+                warning: Color::Rgb(224, 207, 173),
+                error: Color::Rgb(217, 155, 164),
                 border: Color::Rgb(91, 96, 120),
             },
             "gruvbox" => Self {
-                // Gruvbox dark: bg0, bg1, fg1, fg4, bg3; orange accent, blue secondary.
-                // Orange keeps the accent distinct from the yellow warning state.
+                // Gruvbox dark: bg0, bg1, fg1, fg4, bg3; muted terracotta/amber accent, sage secondary.
                 background: Color::Rgb(40, 40, 40),
                 surface: Color::Rgb(60, 56, 54),
-                text: Color::Rgb(235, 219, 178),
+                text: Color::Rgb(221, 213, 192),
                 muted: Color::Rgb(168, 153, 132),
-                accent: Color::Rgb(254, 128, 25),
+                accent: Color::Rgb(191, 134, 88),
                 secondary: Color::Rgb(131, 165, 152),
-                success: Color::Rgb(184, 187, 38),
-                warning: Color::Rgb(250, 189, 47),
-                error: Color::Rgb(251, 73, 52),
+                success: Color::Rgb(158, 160, 65),
+                warning: Color::Rgb(196, 168, 101),
+                error: Color::Rgb(198, 115, 105),
                 border: Color::Rgb(102, 92, 84),
             },
             "nord" => Self {
@@ -554,189 +552,181 @@ impl ThemePalette {
                 background: Color::Rgb(46, 52, 64),
                 surface: Color::Rgb(59, 66, 82),
                 text: Color::Rgb(236, 239, 244),
-                muted: Color::Rgb(216, 222, 233),
+                muted: Color::Rgb(218, 223, 231),
                 accent: Color::Rgb(136, 192, 208),
                 secondary: Color::Rgb(129, 161, 193),
                 success: Color::Rgb(163, 190, 140),
-                warning: Color::Rgb(235, 203, 139),
-                error: Color::Rgb(191, 97, 106),
+                warning: Color::Rgb(218, 197, 156),
+                error: Color::Rgb(194, 104, 113),
                 border: Color::Rgb(76, 86, 106),
             },
             "tokyo-night" => Self {
-                // Tokyo Night: night background, storm panel, terminal black border;
-                // blue accent, purple secondary.
+                // Tokyo Night: night background, storm panel, muted slate-blue accent, lavender secondary.
                 background: Color::Rgb(26, 27, 38),
                 surface: Color::Rgb(36, 40, 59),
-                text: Color::Rgb(192, 202, 245),
-                muted: Color::Rgb(169, 177, 214),
-                accent: Color::Rgb(122, 162, 247),
-                secondary: Color::Rgb(187, 154, 247),
-                success: Color::Rgb(158, 206, 106),
-                warning: Color::Rgb(224, 175, 104),
-                error: Color::Rgb(247, 118, 142),
-                border: Color::Rgb(65, 72, 104),
+                text: Color::Rgb(208, 212, 229),
+                muted: Color::Rgb(178, 182, 205),
+                accent: Color::Rgb(153, 173, 216),
+                secondary: Color::Rgb(194, 179, 222),
+                success: Color::Rgb(158, 198, 114),
+                warning: Color::Rgb(205, 172, 123),
+                error: Color::Rgb(215, 150, 162),
+                border: Color::Rgb(66, 73, 103),
             },
             "dracula" => Self {
-                // Dracula: background, current line, comment border; purple accent, cyan secondary.
-                // #6272a4 is too dim for muted text, so it is lightened.
+                // Dracula: background, current line, softened plum accent, muted cyan secondary.
                 background: Color::Rgb(40, 42, 54),
                 surface: Color::Rgb(68, 71, 90),
                 text: Color::Rgb(248, 248, 242),
-                muted: Color::Rgb(155, 163, 199),
-                accent: Color::Rgb(189, 147, 249),
-                secondary: Color::Rgb(139, 233, 253),
-                success: Color::Rgb(80, 250, 123),
-                warning: Color::Rgb(241, 250, 140),
-                error: Color::Rgb(255, 85, 85),
-                border: Color::Rgb(98, 114, 164),
+                muted: Color::Rgb(160, 166, 194),
+                accent: Color::Rgb(193, 172, 224),
+                secondary: Color::Rgb(172, 211, 220),
+                success: Color::Rgb(127, 203, 146),
+                warning: Color::Rgb(218, 222, 168),
+                error: Color::Rgb(208, 132, 132),
+                border: Color::Rgb(104, 117, 158),
             },
             "monokai" => Self {
-                // Monokai: background, panel, selection border; purple accent, cyan secondary.
-                // Purple keeps the accent distinct from the pink error state.
+                // Monokai: background, panel, selection border; softened purple accent, cyan secondary.
                 background: Color::Rgb(39, 40, 34),
                 surface: Color::Rgb(62, 61, 50),
                 text: Color::Rgb(248, 248, 242),
                 muted: Color::Rgb(168, 164, 148),
-                accent: Color::Rgb(174, 129, 255),
-                secondary: Color::Rgb(102, 217, 239),
-                success: Color::Rgb(166, 226, 46),
-                warning: Color::Rgb(230, 219, 116),
-                error: Color::Rgb(249, 38, 114),
+                accent: Color::Rgb(184, 164, 220),
+                secondary: Color::Rgb(137, 193, 204),
+                success: Color::Rgb(153, 186, 86),
+                warning: Color::Rgb(210, 203, 136),
+                error: Color::Rgb(194, 93, 129),
                 border: Color::Rgb(73, 72, 62),
             },
             "flexoki" => Self {
-                // Flexoki: black, base-950, base-500, base-700; blue accent, purple secondary.
+                // Flexoki: black, base-950, base-500, base-700; muted blue accent, purple secondary.
                 background: Color::Rgb(16, 15, 15),
                 surface: Color::Rgb(28, 27, 26),
                 text: Color::Rgb(206, 205, 195),
                 muted: Color::Rgb(135, 133, 128),
-                accent: Color::Rgb(67, 133, 190),
+                accent: Color::Rgb(72, 133, 185),
                 secondary: Color::Rgb(139, 126, 200),
-                success: Color::Rgb(135, 154, 57),
-                warning: Color::Rgb(218, 112, 44),
-                error: Color::Rgb(209, 77, 65),
+                success: Color::Rgb(132, 150, 61),
+                warning: Color::Rgb(187, 119, 75),
+                error: Color::Rgb(190, 93, 84),
                 border: Color::Rgb(87, 86, 83),
             },
             "rose-pine" => Self {
-                // Rose Pine: base, surface, subtle, highlight med; iris accent, foam secondary.
-                // Success uses Moon pine (#3e8fb0), because base pine is too dark here.
+                // Rose Pine: base, surface, subtle, highlight med; dusty iris accent, foam secondary.
                 background: Color::Rgb(25, 23, 36),
                 surface: Color::Rgb(31, 29, 46),
-                text: Color::Rgb(224, 222, 244),
+                text: Color::Rgb(228, 226, 240),
                 muted: Color::Rgb(144, 140, 170),
-                accent: Color::Rgb(196, 167, 231),
-                secondary: Color::Rgb(156, 207, 216),
-                success: Color::Rgb(62, 143, 176),
-                warning: Color::Rgb(246, 193, 119),
-                error: Color::Rgb(235, 111, 146),
+                accent: Color::Rgb(197, 174, 224),
+                secondary: Color::Rgb(158, 205, 214),
+                success: Color::Rgb(69, 140, 169),
+                warning: Color::Rgb(215, 188, 150),
+                error: Color::Rgb(210, 136, 157),
                 border: Color::Rgb(64, 61, 82),
             },
             "rose-pine-moon" => Self {
-                // Rose Pine Moon: base, surface, subtle, highlight med; iris/foam accents.
+                // Rose Pine Moon: base, surface, subtle, highlight med; dusty iris/foam accents.
                 background: Color::Rgb(35, 33, 54),
                 surface: Color::Rgb(42, 39, 63),
-                text: Color::Rgb(224, 222, 244),
+                text: Color::Rgb(228, 226, 240),
                 muted: Color::Rgb(144, 140, 170),
-                accent: Color::Rgb(196, 167, 231),
-                secondary: Color::Rgb(156, 207, 216),
-                success: Color::Rgb(62, 143, 176),
-                warning: Color::Rgb(246, 193, 119),
-                error: Color::Rgb(235, 111, 146),
+                accent: Color::Rgb(197, 174, 224),
+                secondary: Color::Rgb(158, 205, 214),
+                success: Color::Rgb(69, 140, 169),
+                warning: Color::Rgb(215, 188, 150),
+                error: Color::Rgb(210, 136, 157),
                 border: Color::Rgb(68, 65, 90),
             },
             "rose-pine-dawn" => Self {
-                // Rose Pine Dawn: base, overlay, muted, highlight high; iris/foam accents.
-                // Gold and love are darkened for contrast on the light base.
-                background: Color::Rgb(250, 244, 237),
-                surface: Color::Rgb(242, 233, 225),
+                // Rose Pine Dawn: base, overlay, muted, highlight high; dusty iris/foam accents.
+                background: Color::Rgb(248, 244, 239),
+                surface: Color::Rgb(240, 233, 227),
                 text: Color::Rgb(87, 82, 121),
                 muted: Color::Rgb(110, 106, 134),
                 accent: Color::Rgb(144, 122, 169),
                 secondary: Color::Rgb(74, 131, 140),
-                success: Color::Rgb(40, 105, 131),
-                warning: Color::Rgb(154, 107, 15),
+                success: Color::Rgb(50, 101, 121),
+                warning: Color::Rgb(123, 97, 46),
                 error: Color::Rgb(163, 74, 99),
                 border: Color::Rgb(206, 202, 205),
             },
             "solarized-light" => Self {
-                // Solarized Light: base3, base2, base1 border; blue accent, cyan secondary.
-                // Cyan, green, and yellow are darkened for contrast on the light base.
-                background: Color::Rgb(253, 246, 227),
-                surface: Color::Rgb(238, 232, 213),
+                // Solarized Light: softened warm paper base, muted blue accent, teal secondary.
+                background: Color::Rgb(246, 243, 234),
+                surface: Color::Rgb(234, 230, 217),
                 text: Color::Rgb(88, 110, 117),
-                muted: Color::Rgb(101, 123, 131),
-                accent: Color::Rgb(38, 139, 210),
-                secondary: Color::Rgb(31, 122, 115),
-                success: Color::Rgb(107, 125, 0),
-                warning: Color::Rgb(138, 103, 0),
-                error: Color::Rgb(220, 50, 47),
+                muted: Color::Rgb(99, 120, 128),
+                accent: Color::Rgb(68, 134, 180),
+                secondary: Color::Rgb(46, 107, 102),
+                success: Color::Rgb(81, 89, 36),
+                warning: Color::Rgb(100, 84, 38),
+                error: Color::Rgb(188, 81, 79),
                 border: Color::Rgb(147, 161, 161),
             },
             "solarized-dark" => Self {
-                // Solarized Dark: base03, base02, base01 border; blue accent, cyan secondary.
-                background: Color::Rgb(0, 43, 54),
-                surface: Color::Rgb(7, 54, 66),
+                // Solarized Dark: softened deep teal-slate base, muted blue accent, teal secondary.
+                background: Color::Rgb(18, 32, 36),
+                surface: Color::Rgb(26, 43, 47),
                 text: Color::Rgb(147, 161, 161),
                 muted: Color::Rgb(131, 148, 150),
-                accent: Color::Rgb(38, 139, 210),
-                secondary: Color::Rgb(42, 161, 152),
-                success: Color::Rgb(133, 153, 0),
-                warning: Color::Rgb(181, 137, 0),
-                error: Color::Rgb(220, 50, 47),
+                accent: Color::Rgb(68, 134, 180),
+                secondary: Color::Rgb(61, 142, 136),
+                success: Color::Rgb(107, 116, 47),
+                warning: Color::Rgb(131, 111, 50),
+                error: Color::Rgb(188, 81, 79),
                 border: Color::Rgb(88, 110, 117),
             },
             "atom-one-dark" => Self {
-                // Atom One Dark: bg, bg-dark panel, fg, border; purple accent, blue secondary.
-                // The published comment color is too dim, so muted is lightened.
+                // Atom One Dark: bg, bg-dark panel, fg, border; muted plum accent, slate blue secondary.
                 background: Color::Rgb(40, 44, 52),
                 surface: Color::Rgb(33, 37, 43),
                 text: Color::Rgb(171, 178, 191),
                 muted: Color::Rgb(133, 140, 153),
-                accent: Color::Rgb(198, 120, 221),
-                secondary: Color::Rgb(97, 175, 239),
+                accent: Color::Rgb(191, 132, 209),
+                secondary: Color::Rgb(133, 171, 203),
                 success: Color::Rgb(152, 195, 121),
-                warning: Color::Rgb(229, 192, 123),
-                error: Color::Rgb(224, 108, 117),
+                warning: Color::Rgb(212, 187, 140),
+                error: Color::Rgb(206, 126, 132),
                 border: Color::Rgb(75, 82, 99),
             },
             "atom-one-light" => Self {
-                // Atom One Light: bg, surface, fg, border; purple accent, blue secondary.
+                // Atom One Light: bg, surface, fg, border; muted plum accent, slate blue secondary.
                 background: Color::Rgb(250, 250, 250),
                 surface: Color::Rgb(240, 240, 241),
                 text: Color::Rgb(56, 58, 66),
                 muted: Color::Rgb(105, 108, 119),
-                accent: Color::Rgb(166, 38, 164),
-                secondary: Color::Rgb(64, 120, 242),
-                success: Color::Rgb(80, 161, 79),
-                warning: Color::Rgb(193, 132, 1),
-                error: Color::Rgb(228, 86, 73),
+                accent: Color::Rgb(148, 56, 146),
+                secondary: Color::Rgb(112, 138, 194),
+                success: Color::Rgb(77, 154, 76),
+                warning: Color::Rgb(141, 113, 53),
+                error: Color::Rgb(198, 111, 103),
                 border: Color::Rgb(208, 208, 211),
             },
             "textual-dark" => Self {
-                // Textual dark palette.
+                // Textual dark palette with softened slate-blue accents.
                 background: Color::Rgb(18, 18, 18),
                 surface: Color::Rgb(30, 30, 30),
                 text: Color::Rgb(224, 224, 224),
                 muted: Color::Rgb(140, 140, 140),
-                accent: Color::Rgb(1, 120, 212),
-                secondary: Color::Rgb(0, 170, 255),
-                success: Color::Rgb(78, 191, 113),
-                warning: Color::Rgb(255, 166, 43),
-                error: Color::Rgb(186, 60, 91),
+                accent: Color::Rgb(59, 113, 154),
+                secondary: Color::Rgb(77, 145, 178),
+                success: Color::Rgb(84, 185, 115),
+                warning: Color::Rgb(197, 157, 101),
+                error: Color::Rgb(178, 68, 95),
                 border: Color::Rgb(68, 68, 68),
             },
             "textual-light" => Self {
-                // Textual light palette.
-                // Status colors are darkened for contrast on the light background.
+                // Textual light palette with softened slate-blue accents.
                 background: Color::Rgb(248, 249, 250),
                 surface: Color::Rgb(233, 236, 239),
                 text: Color::Rgb(33, 37, 41),
                 muted: Color::Rgb(92, 99, 106),
-                accent: Color::Rgb(0, 69, 120),
-                secondary: Color::Rgb(1, 120, 212),
-                success: Color::Rgb(46, 125, 79),
-                warning: Color::Rgb(154, 103, 0),
-                error: Color::Rgb(168, 50, 79),
+                accent: Color::Rgb(33, 64, 87),
+                secondary: Color::Rgb(64, 112, 149),
+                success: Color::Rgb(50, 121, 80),
+                warning: Color::Rgb(112, 89, 42),
+                error: Color::Rgb(158, 60, 84),
                 border: Color::Rgb(173, 181, 189),
             },
             "terminal" | "transparent" | "ansi" | "textual-ansi" => Self {
@@ -760,18 +750,18 @@ impl ThemePalette {
                 error: Color::Red,
                 border: Color::Indexed(242),
             },
-            // Default: AniList dark palette
+            // Default: AniList dark palette (softened slate-navy and calm sky blue)
             _ => Self {
-                background: Color::Rgb(11, 22, 34),
-                surface: Color::Rgb(21, 31, 46),
+                background: Color::Rgb(15, 22, 30),
+                surface: Color::Rgb(24, 32, 43),
                 text: Color::Rgb(237, 241, 245),
                 muted: Color::Rgb(139, 160, 178),
-                accent: Color::Rgb(61, 180, 242),
+                accent: Color::Rgb(105, 166, 198),
                 secondary: Color::Rgb(146, 173, 200),
-                success: Color::Rgb(104, 214, 57),
-                warning: Color::Rgb(247, 154, 99),
-                error: Color::Rgb(232, 93, 117),
-                border: Color::Rgb(42, 59, 82),
+                success: Color::Rgb(115, 186, 85),
+                warning: Color::Rgb(210, 164, 136),
+                error: Color::Rgb(204, 121, 135),
+                border: Color::Rgb(48, 60, 76),
             },
         }
     }
@@ -964,8 +954,8 @@ mod tests {
     fn default_theme_is_anilist_and_curated_themes_cycle_cleanly() {
         assert_eq!(DEFAULT_THEME, "anilist");
         let anilist = ThemePalette::from_name("anilist");
-        assert_eq!(anilist.background, Color::Rgb(11, 22, 34));
-        assert_eq!(anilist.accent, Color::Rgb(61, 180, 242));
+        assert_eq!(anilist.background, Color::Rgb(15, 22, 30));
+        assert_eq!(anilist.accent, Color::Rgb(105, 166, 198));
 
         let terminal = ThemePalette::from_name("terminal");
         assert_eq!(terminal.background, Color::Reset);
@@ -1005,6 +995,30 @@ mod tests {
         let (a, b) = (relative_luminance(a)?, relative_luminance(b)?);
         let (lighter, darker) = if a > b { (a, b) } else { (b, a) };
         Some((lighter + 0.05) / (darker + 0.05))
+    }
+
+    fn hsl_saturation(color: Color) -> Option<f64> {
+        let Color::Rgb(r, g, b) = color else {
+            return None;
+        };
+        let (r, g, b) = (
+            f64::from(r) / 255.0,
+            f64::from(g) / 255.0,
+            f64::from(b) / 255.0,
+        );
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let d = max - min;
+        if d <= f64::EPSILON {
+            return Some(0.0);
+        }
+        let l = (max + min) / 2.0;
+        let s = if l > 0.5 {
+            d / (2.0 - max - min)
+        } else {
+            d / (max + min)
+        };
+        Some(s)
     }
 
     #[test]
@@ -1092,6 +1106,27 @@ mod tests {
             assert_ne!(palette.accent, palette.error, "{theme}: accent duplicates error");
             assert_ne!(palette.success, palette.warning, "{theme}: success duplicates warning");
             assert_ne!(palette.warning, palette.error, "{theme}: warning duplicates error");
+
+            // Keep TUI palettes calm and cohesive rather than neon/oversaturated.
+            for (role, color) in [
+                ("background", palette.background),
+                ("surface", palette.surface),
+                ("text", palette.text),
+                ("muted", palette.muted),
+                ("accent", palette.accent),
+                ("secondary", palette.secondary),
+                ("success", palette.success),
+                ("warning", palette.warning),
+                ("error", palette.error),
+                ("border", palette.border),
+            ] {
+                let sat = hsl_saturation(color).expect("RGB palette");
+                assert!(
+                    sat <= 0.50,
+                    "{theme}: {role} saturation is too high ({:.1}%)",
+                    sat * 100.0
+                );
+            }
         }
     }
 }
