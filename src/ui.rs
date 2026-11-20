@@ -1444,10 +1444,10 @@ fn render_details_base(
 }
 
 fn split_details_area(total_width: u16, inner: Rect) -> (Rect, Rect) {
-    if total_width >= 76 && inner.width >= 44 && inner.height >= 6 {
+    if total_width >= 62 && inner.width >= 34 && inner.height >= 5 {
         let raw_cover = ((u32::from(inner.width) * 22) / 100) as u16;
-        let max_cover = inner.width.saturating_sub(32);
-        let cover_w = raw_cover.clamp(12, 26).min(max_cover);
+        let max_cover = inner.width.saturating_sub(24);
+        let cover_w = raw_cover.clamp(10, 26).min(max_cover);
         if cover_w >= 8 {
             let [cover_area, _gap, info_area] = Layout::horizontal([
                 Constraint::Length(cover_w),

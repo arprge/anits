@@ -25,6 +25,10 @@ it's in crates.io, so you can just
 cargo install anits
 ```
 
+> [!TIP]
+> If `anits` command isn't found after installing, add Cargo's /bin directory to your shells `PATH`:
+> run `export PATH="$HOME/.cargo/bin:$PATH"` (or `fish_add_path ~/.cargo/bin` in Fish).
+
 ### Build from source
 
 ```bash
