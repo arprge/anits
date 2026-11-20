@@ -17,14 +17,16 @@ use crate::app::{
     ActiveModal, AppState, AuthField, FilterScope, FocusPane, Screen, SidebarItem, ToastLevel,
 };
 use crate::config::{ANILIST_OAUTH_PIN, ScoreFormatPreference, ThemePalette};
-use crate::domain::{AnimeItem, LibraryStatus, MediaId, Point3Score, ScoreFormat, ScoreRaw};
+use crate::domain::{
+    AnimeItem, LibraryStatus, MediaId, Point3Score, ScoreFormat, ScoreRaw, SortDirection, SortField,
+};
 
 const SPINNER_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 const AUTH_FOOTER_HINT: &str =
     "Tab/↑↓ Field   Ctrl+O Open OAuth   Enter Confirm   Ctrl+C Quit";
 const TABLE_FOOTER_HINT: &str =
-    "1-6 List   / Filter   j/k Move   +/- Ep   a Move   r Rate   v Web   R Sync   ? Help   q Quit";
+    "1-6 List   / Filter   s Sort   j/k Move   +/- Ep   a Move   r Rate   v Web   R Sync   ? Help   q Quit";
 const SIDEBAR_FOOTER_HINT: &str =
     "j/k Select   Enter Open/Sign Out   h Workspace   1-6 List   R Sync   ? Help   q Quit";
 const DETAILS_FOOTER_HINT: &str =
@@ -63,6 +65,8 @@ struct LibraryView<'a> {
     filter_query: &'a str,
     filter_active: bool,
     filter_scope: &'a FilterScope,
+    sort_field: SortField,
+    sort_direction: SortDirection,
     description_scroll: u16,
     syncing: bool,
     sync_tick: usize,
@@ -151,6 +155,8 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
                     filter_query: &state.filter_query,
                     filter_active: state.filter_active,
                     filter_scope: &state.filter_scope,
+                    sort_field: state.sort_field,
+                    sort_direction: state.sort_direction,
                     description_scroll: state.description_scroll,
                     syncing: state.syncing,
                     sync_tick: state.sync_tick,
@@ -196,6 +202,8 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
                 theme_name: state.theme_name(),
                 rating_input: &state.rating_input,
                 rating_input_error: state.rating_input_error.as_deref(),
+                sort_field: state.sort_field,
+                sort_direction: state.sort_direction,
             };
             render_modal(frame, root, &state.modal, palette, &modal_ctx);
         }
@@ -1144,7 +1152,7 @@ fn render_anime_table(
         format!(" {} • {count} ", view.active_status.label())
     };
 
-    let block = Block::bordered()
+    let mut block = Block::bordered()
         .border_type(BorderType::Rounded)
         .padding(Padding::horizontal(1))
         .title(Line::styled(
@@ -1162,6 +1170,18 @@ fn render_anime_table(
         } else {
             palette.border
         }));
+
+    if area.width >= 38 {
+        let sort_badge = format!(
+            " Sort: {} {} ",
+            view.sort_field.short_label(),
+            view.sort_direction.arrow()
+        );
+        block = block.title_top(
+            Line::styled(sort_badge, Style::default().fg(palette.muted))
+                .alignment(Alignment::Right),
+        );
+    }
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -1746,6 +1766,8 @@ struct ModalContext<'a> {
     theme_name: &'a str,
     rating_input: &'a str,
     rating_input_error: Option<&'a str>,
+    sort_field: SortField,
+    sort_direction: SortDirection,
 }
 
 fn render_modal(
@@ -1767,9 +1789,77 @@ fn render_modal(
         ActiveModal::RatingPicker { selected } => {
             render_rating_picker_modal(frame, root, *selected, palette, ctx);
         }
+        ActiveModal::SortPicker { selected } => {
+            render_sort_picker_modal(frame, root, *selected, palette, ctx);
+        }
         ActiveModal::Help => {
             render_help_modal(frame, root, palette, ctx);
         }
+    }
+}
+
+fn render_sort_picker_modal(
+    frame: &mut Frame<'_>,
+    root: Rect,
+    selected: usize,
+    palette: ThemePalette,
+    ctx: &ModalContext<'_>,
+) {
+    let popup = centered_rect(root, 42, 10);
+    frame.render_widget(Clear, popup);
+
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .padding(Padding::horizontal(1))
+        .title(Line::styled(
+            " Sort By ",
+            Style::default()
+                .fg(palette.accent)
+                .add_modifier(Modifier::BOLD),
+        ))
+        .border_style(Style::default().fg(palette.accent))
+        .style(Style::default().bg(palette.surface).fg(palette.text));
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
+
+    let [list_area, hint_area] = if inner.height >= 7 {
+        Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner)
+    } else {
+        [inner, Rect::default()]
+    };
+
+    let selected_idx = selected.min(SortField::ALL.len().saturating_sub(1));
+    let items: Vec<ListItem<'_>> = SortField::ALL
+        .into_iter()
+        .enumerate()
+        .map(|(idx, field)| {
+            let is_sel = idx == selected_idx;
+            let is_cur = field == ctx.sort_field;
+            let label = if is_cur {
+                format!("{}  ({})", field.label(), ctx.sort_direction.arrow())
+            } else {
+                field.label().to_owned()
+            };
+            modal_option_item(&label, is_sel, is_cur, palette)
+        })
+        .collect();
+
+    let mut list_state = ListState::default().with_selected(Some(selected_idx));
+    frame.render_stateful_widget(List::new(items), list_area, &mut list_state);
+
+    if hint_area.height > 0 {
+        frame.render_widget(
+            Paragraph::new(Line::styled(
+                "j/k Move  Enter Apply  r Flip  Esc",
+                Style::default().fg(palette.muted),
+            ))
+            .alignment(Alignment::Center),
+            hint_area,
+        );
     }
 }
 
@@ -2102,7 +2192,7 @@ fn render_help_modal(
     palette: ThemePalette,
     ctx: &ModalContext<'_>,
 ) {
-    let popup = centered_rect(root, 70, 28);
+    let popup = centered_rect(root, 70, 30);
     frame.render_widget(Clear, popup);
 
     let block = Block::bordered()
@@ -2176,6 +2266,7 @@ fn render_help_modal(
         Line::styled("Filter & Sync", section_style),
         help_row("/", "Focus instant local filter"),
         help_row("Ctrl+A", "Toggle scope (List / All)"),
+        help_row("s / S", "Sort list / reverse sort order"),
         help_row("Esc", "Clear filter / unfocus / close modal"),
         help_row("R", "Refresh library from AniList"),
         Line::raw(""),
@@ -2383,6 +2474,8 @@ mod tests {
             filter_query: "",
             filter_active: false,
             filter_scope: &FilterScope::CurrentList,
+            sort_field: SortField::Updated,
+            sort_direction: SortDirection::Desc,
             description_scroll: 0,
             syncing: false,
             sync_tick: 0,
@@ -2480,6 +2573,8 @@ mod tests {
             filter_query: "",
             filter_active: false,
             filter_scope: &FilterScope::AllLists,
+            sort_field: SortField::Updated,
+            sort_direction: SortDirection::Desc,
             description_scroll: 0,
             syncing: true,
             sync_tick: 3,
@@ -2538,6 +2633,8 @@ mod tests {
             filter_query: "",
             filter_active: false,
             filter_scope: &FilterScope::CurrentList,
+            sort_field: SortField::Updated,
+            sort_direction: SortDirection::Desc,
             description_scroll: 0,
             syncing: false,
             sync_tick: 0,
@@ -2594,6 +2691,8 @@ mod tests {
             theme_name: "anilist",
             rating_input: "",
             rating_input_error: None,
+            sort_field: SortField::Updated,
+            sort_direction: SortDirection::Desc,
         };
 
         terminal
@@ -2624,6 +2723,8 @@ mod tests {
             theme_name: "anilist",
             rating_input: "",
             rating_input_error: None,
+            sort_field: SortField::Updated,
+            sort_direction: SortDirection::Desc,
         };
 
         terminal
@@ -2656,6 +2757,8 @@ mod tests {
             theme_name: "anilist",
             rating_input: "9.8",
             rating_input_error: None,
+            sort_field: SortField::Score,
+            sort_direction: SortDirection::Desc,
         };
         terminal
             .draw(|f| {
@@ -2690,6 +2793,26 @@ mod tests {
         assert!(help_buf.contains("Filter & Sync"));
         assert!(help_buf.contains("Library Actions"));
         assert!(help_buf.contains("t Theme   s Rating   Esc / ? Close"));
+
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                fill_background(f, area, palette);
+                render_modal(
+                    f,
+                    area,
+                    &ActiveModal::SortPicker { selected: 2 },
+                    palette,
+                    &decimal_ctx,
+                );
+            })
+            .unwrap();
+        let sort_buf = buffer_to_string(terminal.backend());
+        assert!(sort_buf.contains("Sort By"));
+        assert!(sort_buf.contains("Recently Updated"));
+        assert!(sort_buf.contains("My Rating  (↓) ✓"));
+        assert!(sort_buf.contains("Average Score"));
+        assert!(sort_buf.contains("Episode Progress"));
     }
 
     #[test]
@@ -2721,6 +2844,8 @@ mod tests {
                 filter_query: "",
                 filter_active: false,
                 filter_scope: &FilterScope::CurrentList,
+                sort_field: SortField::Updated,
+                sort_direction: SortDirection::Desc,
                 description_scroll: 0,
                 syncing: false,
                 sync_tick: 0,
@@ -2894,6 +3019,8 @@ mod tests {
                 filter_query: "",
                 filter_active: false,
                 filter_scope: &FilterScope::CurrentList,
+                sort_field: SortField::Updated,
+                sort_direction: SortDirection::Desc,
                 description_scroll: 0,
                 syncing: true,
                 sync_tick: 1,
@@ -2912,6 +3039,8 @@ mod tests {
                 theme_name: "anilist",
                 rating_input: "",
                 rating_input_error: None,
+                sort_field: SortField::Updated,
+                sort_direction: SortDirection::Desc,
             };
             let mut table_offset = 0;
             terminal

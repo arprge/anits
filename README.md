@@ -10,7 +10,7 @@ Fast terminal user interface for managing your personal [AniList](https://anilis
 
 ## Features
 
-- **Instant library navigation & filtering** across `Watching`, `Planning`, `Completed`, `Dropped`, `Paused`, and `Repeating` (`0ms` in-memory search via `/`)
+- **Instant library navigation, filtering & sorting** across `Watching`, `Planning`, `Completed`, `Dropped`, `Paused`, and `Repeating` (`0ms` in-memory search via `/` and sort via `s`/`S`)
 - **Terminal cover art** via `ratatui-image` (requires terminal with image support, like kitty, ghostty, wezterm) with off-thread decoding and disk + LRU caching
 - **Optimistic mutations** for episode progress (`+`/`-`), collection moves (`a`), and ratings (`r`) with automatic rollback on network errors
 - **Account-aware rating system** following your AniList `scoreFormat` (`9.8/10`, `100`, `10`, `5★`, `3-point smiley`)
@@ -63,6 +63,7 @@ cargo install --path . --locked
 | `J` / `K` or `PgDn` / `PgUp` | Scroll anime synopsis                                               |
 | `g` / `G`                    | Jump to top / bottom                                                |
 | `/`                          | Filter library (`Ctrl+A` toggles `Current List` / `All Lists`)      |
+| `s` / `S`                    | Open **Sort By** picker / reverse sort order (`↑` / `↓`)            |
 | `+` / `i`, `-` / `d`         | Increment / decrement watched episodes (debounced)                  |
 | `a`                          | Move entry to another collection or remove from library             |
 | `r`                          | Rate anime or clear rating                                          |
@@ -83,6 +84,10 @@ theme = "anilist"
 # background = "transparent"
 # Rating format: "auto", "point-10-decimal", "point-100", "point-10", "point-5", "point-3"
 score_format = "auto"
+# Sort field: "updated", "title", "score", "average-score", "progress"
+sort_by = "updated"
+# Sort order: "asc", "desc"
+sort_order = "desc"
 ```
 
 - **Auth session**: `~/.config/anits/auth.json` (`0o600` on Unix)

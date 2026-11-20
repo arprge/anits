@@ -12,7 +12,7 @@ use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::domain::ScoreFormat;
+use crate::domain::{ScoreFormat, SortDirection, SortField};
 
 /// Default theme name (AniList dark palette).
 pub const DEFAULT_THEME: &str = "anilist";
@@ -101,6 +101,8 @@ pub struct AppConfig {
     pub theme: String,
     pub background: Option<String>,
     pub score_format: ScoreFormatPreference,
+    pub sort_by: SortField,
+    pub sort_order: SortDirection,
 }
 
 impl Default for AppConfig {
@@ -109,6 +111,8 @@ impl Default for AppConfig {
             theme: DEFAULT_THEME.to_owned(),
             background: None,
             score_format: ScoreFormatPreference::Auto,
+            sort_by: SortField::Updated,
+            sort_order: SortField::Updated.default_direction(),
         }
     }
 }
@@ -124,6 +128,10 @@ struct RawUiConfig {
     background: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     score_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sort_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sort_order: Option<String>,
 }
 
 /// Persisted AniList authentication state from `~/.config/anits/auth.json`.
@@ -260,11 +268,23 @@ pub fn load_app_config_from(path: &Path) -> AppConfig {
         .as_deref()
         .and_then(ScoreFormatPreference::from_config_value)
         .unwrap_or_default();
+    let sort_by = ui
+        .sort_by
+        .as_deref()
+        .and_then(SortField::from_config_key)
+        .unwrap_or_default();
+    let sort_order = ui
+        .sort_order
+        .as_deref()
+        .and_then(SortDirection::from_config_key)
+        .unwrap_or_else(|| sort_by.default_direction());
 
     AppConfig {
         theme,
         background,
         score_format,
+        sort_by,
+        sort_order,
     }
 }
 
@@ -281,6 +301,8 @@ pub fn save_app_config_to(path: &Path, cfg: &AppConfig) -> Result<(), ConfigErro
             theme: Some(cfg.theme.clone()),
             background: cfg.background.clone(),
             score_format: Some(cfg.score_format.config_value().to_owned()),
+            sort_by: Some(cfg.sort_by.config_key().to_owned()),
+            sort_order: Some(cfg.sort_order.config_key().to_owned()),
         }),
     };
     let toml_text = toml::to_string_pretty(&raw).map_err(|source| ConfigError::Toml {
@@ -839,6 +861,7 @@ mod tests {
             theme: "nord".to_owned(),
             background: Some("#101218".to_owned()),
             score_format: ScoreFormatPreference::Auto,
+            ..AppConfig::default()
         };
         let palette = ThemePalette::from_config(&cfg);
         assert_eq!(palette.background, Color::Rgb(16, 18, 24));
@@ -928,11 +951,19 @@ mod tests {
             theme: "nord".to_owned(),
             background: Some("#11111b".to_owned()),
             score_format: ScoreFormatPreference::Override(ScoreFormat::Point5),
+            sort_by: SortField::Title,
+            sort_order: SortDirection::Asc,
         };
         save_app_config_to(&path, &cfg).unwrap();
 
         let loaded = load_app_config_from(&path);
         assert_eq!(loaded, cfg);
+
+        // Specifying sort_by without sort_order uses the field's natural default direction.
+        fs::write(&path, "[ui]\nsort_by = \"title\"\n").unwrap();
+        let title_default = load_app_config_from(&path);
+        assert_eq!(title_default.sort_by, SortField::Title);
+        assert_eq!(title_default.sort_order, SortDirection::Asc);
 
         // Unrecognized or missing score_format safely defaults to Auto.
         fs::write(&path, "[ui]\ntheme = \"nord\"\nscore_format = \"unknown\"\n").unwrap();

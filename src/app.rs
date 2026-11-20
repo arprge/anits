@@ -24,7 +24,7 @@ use crate::config::{
 };
 use crate::domain::{
     AnimeItem, EntryId, LibraryCollection, LibraryEntry, LibraryStatus, MediaId, Point3Score,
-    ScoreFormat, ScoreRaw, ScoreUpdate,
+    ScoreFormat, ScoreRaw, ScoreUpdate, SortDirection, SortField,
 };
 
 const PROGRESS_DEBOUNCE: Duration = Duration::from_millis(250);
@@ -118,6 +118,7 @@ pub enum ActiveModal {
     None,
     StatusPicker { selected: usize },
     RatingPicker { selected: usize },
+    SortPicker { selected: usize },
     Help,
 }
 
@@ -343,6 +344,8 @@ pub struct AppState {
     pub filter_query: String,
     pub filter_active: bool,
     pub filter_scope: FilterScope,
+    pub sort_field: SortField,
+    pub sort_direction: SortDirection,
     pub description_scroll: u16,
     pub modal: ActiveModal,
     pub score_format_pref: ScoreFormatPreference,
@@ -401,6 +404,8 @@ impl AppState {
             None
         };
         let score_format_pref = app_config.score_format;
+        let sort_field = app_config.sort_by;
+        let sort_direction = app_config.sort_order;
 
         Self {
             screen,
@@ -415,6 +420,8 @@ impl AppState {
             filter_query: String::new(),
             filter_active: false,
             filter_scope: FilterScope::CurrentList,
+            sort_field,
+            sort_direction,
             description_scroll: 0,
             modal: ActiveModal::None,
             score_format_pref,
@@ -499,6 +506,7 @@ impl AppState {
                 ScoreFormat::Point5 => 6,
                 _ => 0,
             },
+            ActiveModal::SortPicker { .. } => SortField::ALL.len(),
             ActiveModal::Help | ActiveModal::None => 0,
         }
     }
@@ -527,6 +535,24 @@ impl AppState {
                 if matches {
                     self.visible_rows.push((status, idx));
                 }
+            }
+        }
+
+        match self.sort_field {
+            SortField::Updated => {
+                if self.sort_direction == SortDirection::Asc {
+                    self.visible_rows.reverse();
+                }
+            }
+            field => {
+                let direction = self.sort_direction;
+                let library = &self.library;
+                self.visible_rows.sort_by(|&(sa, ia), &(sb, ib)| {
+                    match (library.items_for(sa).get(ia), library.items_for(sb).get(ib)) {
+                        (Some(a), Some(b)) => field.compare_items(a, b, direction),
+                        _ => sa.index().cmp(&sb.index()).then_with(|| ia.cmp(&ib)),
+                    }
+                });
             }
         }
 
@@ -975,6 +1001,15 @@ impl AppState {
                 self.filter_active = true;
                 return Vec::new();
             }
+            KeyCode::Char('s') => {
+                self.modal = ActiveModal::SortPicker {
+                    selected: self.sort_field.index(),
+                };
+                return Vec::new();
+            }
+            KeyCode::Char('S') => {
+                return self.apply_sort(self.sort_field, self.sort_direction.toggle());
+            }
             KeyCode::Esc => {
                 if !self.filter_query.is_empty() {
                     self.filter_query.clear();
@@ -1330,7 +1365,71 @@ impl AppState {
                 let format = self.effective_score_format();
                 self.handle_rating_modal_key(key, format, selected)
             }
+            ActiveModal::SortPicker { selected } => match key.code {
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('s') => {
+                    self.modal = ActiveModal::None;
+                    Vec::new()
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    if count > 0 {
+                        self.modal = ActiveModal::SortPicker {
+                            selected: (selected + 1).min(count - 1),
+                        };
+                    }
+                    Vec::new()
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.modal = ActiveModal::SortPicker {
+                        selected: selected.saturating_sub(1),
+                    };
+                    Vec::new()
+                }
+                KeyCode::Char('r') | KeyCode::Char(' ') => {
+                    self.apply_sort(self.sort_field, self.sort_direction.toggle())
+                }
+                KeyCode::Char(ch @ '1'..='5') => {
+                    let idx = usize::from((ch as u8) - b'1');
+                    self.modal = ActiveModal::None;
+                    self.confirm_sort_picker(idx)
+                }
+                KeyCode::Enter => {
+                    self.modal = ActiveModal::None;
+                    self.confirm_sort_picker(selected)
+                }
+                _ => Vec::new(),
+            },
         }
+    }
+
+    fn confirm_sort_picker(&mut self, selected: usize) -> Vec<AppCommand> {
+        let Some(field) = SortField::from_index(selected) else {
+            return Vec::new();
+        };
+        let direction = if field == self.sort_field {
+            self.sort_direction.toggle()
+        } else {
+            field.default_direction()
+        };
+        self.apply_sort(field, direction)
+    }
+
+    fn apply_sort(&mut self, field: SortField, direction: SortDirection) -> Vec<AppCommand> {
+        let prev_selected_id = self.selected_item().map(|item| item.id);
+        self.sort_field = field;
+        self.sort_direction = direction;
+        self.app_config.sort_by = field;
+        self.app_config.sort_order = direction;
+        self.rebuild_visible_rows();
+        if let Some(prev_id) = prev_selected_id {
+            self.select_media_id_if_visible(prev_id);
+        }
+        self.set_toast(
+            format!("Sorted by {} {}", field.short_label(), direction.arrow()),
+            ToastLevel::Success,
+        );
+        let mut cmds = vec![AppCommand::SaveAppConfig(self.app_config.clone())];
+        cmds.extend(self.ensure_covers_commands());
+        cmds
     }
 
     fn cycle_theme(&mut self) -> Vec<AppCommand> {
@@ -1772,6 +1871,11 @@ impl AppState {
         let previous_progress = self.progress_rollback_base.remove(&media_id);
         let seq = self.next_seq();
         self.active_mutations.insert(media_id, seq);
+
+        if self.sort_field == SortField::Score {
+            self.rebuild_visible_rows();
+            self.select_media_id_if_visible(media_id);
+        }
 
         vec![AppCommand::SaveScore {
             media_id,
@@ -3470,5 +3574,46 @@ mod tests {
         });
         assert_eq!(state.visible_len(), 2);
         assert!(!snap_cmds.is_empty());
+    }
+
+    #[test]
+    fn sort_picker_and_reverse_toggle_reorder_visible_rows_and_persist_config() {
+        let mut state = authenticated_state(sample_library());
+        // sample_library() Watching list has [Frieren (id 1), Cowboy Bebop (id 2)].
+        assert_eq!(state.visible_items()[0].id, media_id(1));
+        assert_eq!(state.visible_items()[1].id, media_id(2));
+        assert_eq!(state.sort_field, SortField::Updated);
+        assert_eq!(state.sort_direction, SortDirection::Desc);
+
+        // Open Sort By modal with `s`, move down to Title, and apply with Enter.
+        state.handle_key(key(KeyCode::Char('s')));
+        assert_eq!(state.modal, ActiveModal::SortPicker { selected: 0 });
+        state.handle_key(key(KeyCode::Char('j')));
+        assert_eq!(state.modal, ActiveModal::SortPicker { selected: 1 });
+        let cmds = state.handle_key(key(KeyCode::Enter));
+        assert_eq!(state.modal, ActiveModal::None);
+        assert_eq!(state.sort_field, SortField::Title);
+        assert_eq!(state.sort_direction, SortDirection::Asc);
+        // Cowboy Bebop < Frieren alphabetically, and previous selection (Frieren) is preserved.
+        assert_eq!(state.visible_items()[0].id, media_id(2));
+        assert_eq!(state.visible_items()[1].id, media_id(1));
+        assert_eq!(state.selected_item().map(|i| i.id), Some(media_id(1)));
+        assert!(cmds.iter().any(|cmd| matches!(
+            cmd,
+            AppCommand::SaveAppConfig(cfg)
+                if cfg.sort_by == SortField::Title && cfg.sort_order == SortDirection::Asc
+        )));
+
+        // Press `S` to reverse direction to Title Desc -> Frieren first again.
+        let rev_cmds = state.handle_key(key(KeyCode::Char('S')));
+        assert_eq!(state.sort_field, SortField::Title);
+        assert_eq!(state.sort_direction, SortDirection::Desc);
+        assert_eq!(state.visible_items()[0].id, media_id(1));
+        assert_eq!(state.visible_items()[1].id, media_id(2));
+        assert!(rev_cmds.iter().any(|cmd| matches!(
+            cmd,
+            AppCommand::SaveAppConfig(cfg)
+                if cfg.sort_by == SortField::Title && cfg.sort_order == SortDirection::Desc
+        )));
     }
 }

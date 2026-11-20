@@ -1,6 +1,7 @@
 //! Type-driven domain models for AniList library entries and local filtering.
 
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::num::{NonZeroU8, NonZeroU32};
@@ -542,6 +543,260 @@ impl ScoreUpdate {
         match self {
             Self::Clear => 0,
             Self::Set(score) => score.get(),
+        }
+    }
+}
+
+/// Sort direction applied to [`SortField`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum SortDirection {
+    /// Ascending (`A -> Z`, lowest -> highest, oldest -> newest).
+    Asc,
+    /// Descending (`Z -> A`, highest -> lowest, newest -> oldest).
+    #[default]
+    Desc,
+}
+
+impl SortDirection {
+    /// Toggles between [`SortDirection::Asc`] and [`SortDirection::Desc`].
+    #[must_use]
+    pub const fn toggle(self) -> Self {
+        match self {
+            Self::Asc => Self::Desc,
+            Self::Desc => Self::Asc,
+        }
+    }
+
+    /// Compact arrow glyph for table headers and status badges.
+    #[must_use]
+    pub const fn arrow(self) -> &'static str {
+        match self {
+            Self::Asc => "↑",
+            Self::Desc => "↓",
+        }
+    }
+
+    /// Human-readable direction label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Asc => "Ascending",
+            Self::Desc => "Descending",
+        }
+    }
+
+    /// Config key written to `~/.config/anits/config.toml`.
+    #[must_use]
+    pub const fn config_key(self) -> &'static str {
+        match self {
+            Self::Asc => "asc",
+            Self::Desc => "desc",
+        }
+    }
+
+    /// Parses a `config.toml` sort direction key.
+    #[must_use]
+    pub fn from_config_key(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "asc" | "ascending" => Some(Self::Asc),
+            "desc" | "descending" => Some(Self::Desc),
+            _ => None,
+        }
+    }
+}
+
+/// Field used to sort visible anime entries in the library table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum SortField {
+    /// Preserve AniList's default `UPDATED_TIME_DESC` order.
+    #[default]
+    Updated,
+    /// Alphabetical by anime title (case-insensitive).
+    Title,
+    /// User's personal rating (`entry.score`).
+    Score,
+    /// Community AniList average score (`average_score`).
+    AverageScore,
+    /// Watched episode count (`entry.progress`).
+    Progress,
+}
+
+impl SortField {
+    /// Canonical display order in the Sort By picker modal.
+    pub const ALL: [Self; 5] = [
+        Self::Updated,
+        Self::Title,
+        Self::Score,
+        Self::AverageScore,
+        Self::Progress,
+    ];
+
+    /// Zero-based index matching [`SortField::ALL`].
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Updated => 0,
+            Self::Title => 1,
+            Self::Score => 2,
+            Self::AverageScore => 3,
+            Self::Progress => 4,
+        }
+    }
+
+    /// Maps a zero-based picker index back to [`SortField`].
+    #[must_use]
+    pub const fn from_index(idx: usize) -> Option<Self> {
+        match idx {
+            0 => Some(Self::Updated),
+            1 => Some(Self::Title),
+            2 => Some(Self::Score),
+            3 => Some(Self::AverageScore),
+            4 => Some(Self::Progress),
+            _ => None,
+        }
+    }
+
+    /// Natural default direction when switching to this sort field.
+    #[must_use]
+    pub const fn default_direction(self) -> SortDirection {
+        match self {
+            Self::Title => SortDirection::Asc,
+            Self::Updated | Self::Score | Self::AverageScore | Self::Progress => {
+                SortDirection::Desc
+            }
+        }
+    }
+
+    /// Descriptive label displayed in the Sort By modal.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Updated => "Recently Updated",
+            Self::Title => "Title",
+            Self::Score => "My Rating",
+            Self::AverageScore => "Average Score",
+            Self::Progress => "Episode Progress",
+        }
+    }
+
+    /// Compact label for table header badges and toasts.
+    #[must_use]
+    pub const fn short_label(self) -> &'static str {
+        match self {
+            Self::Updated => "Updated",
+            Self::Title => "Title",
+            Self::Score => "Rating",
+            Self::AverageScore => "Avg",
+            Self::Progress => "Progress",
+        }
+    }
+
+    /// Config key written to `~/.config/anits/config.toml`.
+    #[must_use]
+    pub const fn config_key(self) -> &'static str {
+        match self {
+            Self::Updated => "updated",
+            Self::Title => "title",
+            Self::Score => "score",
+            Self::AverageScore => "average-score",
+            Self::Progress => "progress",
+        }
+    }
+
+    /// Parses a `config.toml` sort field key.
+    #[must_use]
+    pub fn from_config_key(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "updated" | "default" | "recent" => Some(Self::Updated),
+            "title" | "name" | "alphabetical" => Some(Self::Title),
+            "score" | "rating" => Some(Self::Score),
+            "average-score" | "average_score" | "avg" | "average" => Some(Self::AverageScore),
+            "progress" | "episodes" => Some(Self::Progress),
+            _ => None,
+        }
+    }
+
+    /// Compares two [`AnimeItem`] entries under this sort field and `direction`.
+    ///
+    /// Unrated / missing scores (`None`) are always placed after present values so
+    /// ascending score sorts surface the lowest rated titles first instead of unrated ones.
+    #[must_use]
+    pub fn compare_items(self, a: &AnimeItem, b: &AnimeItem, direction: SortDirection) -> Ordering {
+        let title_tiebreak = || {
+            cmp_case_insensitive(&a.title, &b.title)
+                .then_with(|| a.title.cmp(&b.title))
+                .then_with(|| a.id.get().cmp(&b.id.get()))
+        };
+
+        match self {
+            Self::Updated => title_tiebreak(),
+            Self::Title => {
+                let ord = cmp_case_insensitive(&a.title, &b.title)
+                    .then_with(|| a.title.cmp(&b.title));
+                let directed = match direction {
+                    SortDirection::Asc => ord,
+                    SortDirection::Desc => ord.reverse(),
+                };
+                directed.then_with(|| a.id.get().cmp(&b.id.get()))
+            }
+            Self::Score => compare_optional_ord(a.entry.score, b.entry.score, direction)
+                .then_with(title_tiebreak),
+            Self::AverageScore => {
+                compare_optional_ord(a.average_score, b.average_score, direction)
+                    .then_with(title_tiebreak)
+            }
+            Self::Progress => {
+                let ord = a.entry.progress.cmp(&b.entry.progress);
+                let directed = match direction {
+                    SortDirection::Asc => ord,
+                    SortDirection::Desc => ord.reverse(),
+                };
+                directed.then_with(title_tiebreak)
+            }
+        }
+    }
+}
+
+fn compare_optional_ord<T: Ord>(
+    a: Option<T>,
+    b: Option<T>,
+    direction: SortDirection,
+) -> Ordering {
+    match (a, b) {
+        (Some(va), Some(vb)) => match direction {
+            SortDirection::Asc => va.cmp(&vb),
+            SortDirection::Desc => vb.cmp(&va),
+        },
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
+}
+
+fn cmp_case_insensitive(a: &str, b: &str) -> Ordering {
+    if a.is_ascii() && b.is_ascii() {
+        for (ba, bb) in a.bytes().zip(b.bytes()) {
+            let ord = ba.to_ascii_lowercase().cmp(&bb.to_ascii_lowercase());
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+        return a.len().cmp(&b.len());
+    }
+
+    let mut ca = a.chars().flat_map(char::to_lowercase);
+    let mut cb = b.chars().flat_map(char::to_lowercase);
+    loop {
+        match (ca.next(), cb.next()) {
+            (Some(la), Some(lb)) => {
+                let ord = la.cmp(&lb);
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
         }
     }
 }
@@ -1225,5 +1480,77 @@ mod tests {
         assert_eq!(item.release_status_display(), "Not Yet Released");
         item.release_status = "RELEASING".to_owned();
         assert_eq!(item.release_status_display(), "Releasing");
+    }
+
+    #[test]
+    fn sort_field_compares_title_score_avg_and_progress_deterministically() {
+        let mut a = sample_item(1, "beta", None, &[], Some(12));
+        a.entry.score = ScoreRaw::new(80);
+        a.average_score = Some(75);
+        a.entry.progress = 10;
+
+        let mut b = sample_item(2, "Alpha", None, &[], Some(24));
+        b.entry.score = None;
+        b.average_score = Some(92);
+        b.entry.progress = 3;
+
+        let mut c = sample_item(3, "Gamma", None, &[], Some(12));
+        c.entry.score = ScoreRaw::new(95);
+        c.average_score = None;
+        c.entry.progress = 12;
+
+        // Title Asc (case-insensitive): Alpha < beta < Gamma
+        assert_eq!(
+            SortField::Title.compare_items(&b, &a, SortDirection::Asc),
+            Ordering::Less
+        );
+        assert_eq!(
+            SortField::Title.compare_items(&a, &c, SortDirection::Asc),
+            Ordering::Less
+        );
+        // Title Desc: Gamma < beta < Alpha
+        assert_eq!(
+            SortField::Title.compare_items(&c, &a, SortDirection::Desc),
+            Ordering::Less
+        );
+
+        // Score Desc: 95 (c) < 80 (a) < None (b)
+        assert_eq!(
+            SortField::Score.compare_items(&c, &a, SortDirection::Desc),
+            Ordering::Less
+        );
+        assert_eq!(
+            SortField::Score.compare_items(&a, &b, SortDirection::Desc),
+            Ordering::Less
+        );
+        // Score Asc: 80 (a) < 95 (c) < None (b) — unrated stays last
+        assert_eq!(
+            SortField::Score.compare_items(&a, &c, SortDirection::Asc),
+            Ordering::Less
+        );
+        assert_eq!(
+            SortField::Score.compare_items(&c, &b, SortDirection::Asc),
+            Ordering::Less
+        );
+
+        // AverageScore Desc: 92 (b) < 75 (a) < None (c)
+        assert_eq!(
+            SortField::AverageScore.compare_items(&b, &a, SortDirection::Desc),
+            Ordering::Less
+        );
+        assert_eq!(
+            SortField::AverageScore.compare_items(&a, &c, SortDirection::Desc),
+            Ordering::Less
+        );
+
+        // Progress Desc: 12 (c) < 10 (a) < 3 (b)
+        assert_eq!(
+            SortField::Progress.compare_items(&c, &a, SortDirection::Desc),
+            Ordering::Less
+        );
+        assert_eq!(
+            SortField::Progress.compare_items(&a, &b, SortDirection::Desc),
+            Ordering::Less
+        );
     }
 }
