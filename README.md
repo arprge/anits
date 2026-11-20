@@ -35,15 +35,17 @@ cargo install --path . --locked
 
 ## AniList Setup
 
-1. Open [AniList Developer Settings](https://anilist.co/settings/developer) and click `Create New Client`. Set the `Redirect URL` to `https://anilist.co/api/v2/oauth/pin`
+1. Open [AniList Developer Settings](https://anilist.co/settings/developer) and click `Create New Client`
 
-   <img src="assets/guide/open.png" alt="guide" width="550">
+   <img src="assets/guide/open.png" alt="guide" width="650">
+   
+2. Set the `Redirect URL` to `https://anilist.co/api/v2/oauth/pin`
 
-   <img src="assets/guide/make.png" alt="guide" width="550">
+   <img src="assets/guide/make.png" alt="guide" width="650">
 
-2. Launch `anits`, enter your **Client ID**, press `Ctrl+O` to open the OAuth link in your browser, and paste the token
+3. Launch `anits`, enter your **Client ID**, press `Ctrl+O` to open the OAuth link in your browser, and paste the token
 
-   <img src="assets/guide/paste.png" alt="guide" width="550">
+   <img src="assets/guide/paste.png" alt="guide" width="650">
 
 > [!NOTE]
 > If AniList reports `unsupported_grant_type`, the client's Redirect URL is
