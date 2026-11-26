@@ -14,7 +14,7 @@ Fast terminal user interface for managing your personal [AniList](https://anilis
 - **Terminal cover art** via `ratatui-image` (requires terminal with image support, like kitty, ghostty, wezterm) with off-thread decoding and disk + LRU caching
 - **Optimistic mutations** for episode progress (`+`/`-`), collection moves (`a`), and ratings (`r`) with automatic rollback on network errors
 - **Account-aware rating system** following your AniList `scoreFormat` (`9.8/10`, `100`, `10`, `5★`, `3-point smiley`)
-- **Colorschemes** including the default AniList dark palette, transparent terminal theme, Catppuccin Mocha, Tokyo Night, Nord, Gruvbox, and Dracula
+- **Colorschemes** including the default AniList dark palette, transparent theme that follows terminal colors, Catppuccin Mocha, Tokyo Night, Nord, Gruvbox, and Dracula
 - **Instant startup** via cached snapshots (`stale-while-revalidate`) and persistent HTTP/2 connection pooling
 
 ## Installation
