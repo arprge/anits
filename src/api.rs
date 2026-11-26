@@ -20,6 +20,8 @@ pub const ANILIST_GRAPHQL_URL: &str = "https://graphql.anilist.co";
 
 const DEFAULT_PER_CHUNK: u32 = 500;
 const MAX_CHUNKS: u32 = 20;
+const CHUNK_PACE_DELAY: Duration = Duration::from_millis(150);
+const READ_RETRY_DELAY: Duration = Duration::from_millis(350);
 const DEFAULT_RETRY_AFTER_SECS: u64 = 60;
 const MAX_BACKOFF_SECS: u64 = 120;
 
@@ -143,6 +145,16 @@ impl AnilistError {
     pub const fn is_rate_limited(&self) -> bool {
         matches!(self, Self::RateLimited { .. })
     }
+
+    /// Returns `true` for transient transport or gateway errors safe to retry on read-only queries.
+    #[must_use]
+    pub fn is_transient(&self) -> bool {
+        match self {
+            Self::Http(err) => err.is_timeout() || err.is_connect(),
+            Self::HttpStatus { status, .. } => matches!(status, 502..=504),
+            _ => false,
+        }
+    }
 }
 
 /// Persistent, connection-pooled AniList GraphQL client.
@@ -204,7 +216,7 @@ impl AnilistClient {
         }
 
         let data: ViewerData = self
-            .post_graphql(VIEWER_QUERY, serde_json::json!({}), Some(token))
+            .post_graphql_read(VIEWER_QUERY, serde_json::json!({}), Some(token))
             .await?;
         data.viewer
             .map(|v| v.name)
@@ -222,13 +234,16 @@ impl AnilistClient {
         let mut score_format = None;
 
         for chunk in 1..=MAX_CHUNKS {
+            if chunk > 1 {
+                tokio::time::sleep(CHUNK_PACE_DELAY).await;
+            }
             let vars = serde_json::json!({
                 "username": username,
                 "chunk": chunk,
                 "perChunk": DEFAULT_PER_CHUNK,
             });
             let data: FullLibraryData = self
-                .post_graphql(FULL_LIBRARY_QUERY, vars, token)
+                .post_graphql_read(FULL_LIBRARY_QUERY, vars, token)
                 .await?;
             let has_next =
                 merge_library_chunk(data, &mut grouped, &mut seen_ids, &mut score_format);
@@ -297,6 +312,22 @@ impl AnilistClient {
             .post_graphql(DELETE_ENTRY_MUTATION, vars, Some(token))
             .await?;
         Ok(data.deleted.is_some_and(|d| d.deleted))
+    }
+
+    async fn post_graphql_read<V: Serialize + Clone, D: for<'de> Deserialize<'de>>(
+        &self,
+        query: &str,
+        variables: V,
+        token: Option<&str>,
+    ) -> Result<D, AnilistError> {
+        match self.post_graphql(query, variables.clone(), token).await {
+            Ok(data) => Ok(data),
+            Err(err) if err.is_transient() && self.check_backoff().is_none() => {
+                tokio::time::sleep(READ_RETRY_DELAY).await;
+                self.post_graphql(query, variables, token).await
+            }
+            Err(err) => Err(err),
+        }
     }
 
     async fn post_graphql<V: Serialize, D: for<'de> Deserialize<'de>>(
@@ -1001,5 +1032,31 @@ mod tests {
         let lib = build_library_collection(envelope.data.unwrap());
         assert_eq!(lib.count_for(LibraryStatus::Watching), 1);
         assert!(lib.items_for(LibraryStatus::Watching)[0].genres.is_empty());
+    }
+
+    #[test]
+    fn transient_error_classification_only_matches_gateway_and_transport_errors() {
+        for status in [502, 503, 504] {
+            let err = AnilistError::HttpStatus {
+                status,
+                body: String::new(),
+            };
+            assert!(err.is_transient());
+        }
+
+        for status in [400, 404, 500] {
+            let err = AnilistError::HttpStatus {
+                status,
+                body: String::new(),
+            };
+            assert!(!err.is_transient());
+        }
+
+        assert!(!AnilistError::Unauthorized.is_transient());
+        assert!(!AnilistError::RateLimited {
+            retry_after_secs: 30
+        }
+        .is_transient());
+        assert!(!AnilistError::GraphQl("boom".to_owned()).is_transient());
     }
 }

@@ -1,7 +1,7 @@
 //! Application state machine, optimistic mutation reconciliation, and async event loop.
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crossterm::event::{
     Event as CrosstermEvent, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
@@ -27,9 +27,11 @@ use crate::domain::{
     ScoreFormat, ScoreRaw, ScoreUpdate, SortDirection, SortField,
 };
 
-const PROGRESS_DEBOUNCE: Duration = Duration::from_millis(250);
+const PROGRESS_DEBOUNCE: Duration = Duration::from_millis(340);
+const STARTUP_SNAPSHOT_FRESHNESS_SECS: u64 = 10;
 const TICK_INTERVAL: Duration = Duration::from_millis(120);
-const QUIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(2);
+const QUIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(3);
+const QUIT_FLUSH_PACE_DELAY: Duration = Duration::from_millis(150);
 const TOAST_SHORT: Duration = Duration::from_secs(3);
 const TOAST_LONG: Duration = Duration::from_secs(5);
 const PREFETCH_RADIUS: usize = 5;
@@ -991,7 +993,7 @@ impl AppState {
                 return Vec::new();
             }
             KeyCode::Char('R') => {
-                if self.username.is_some() {
+                if self.username.is_some() && !self.syncing {
                     self.syncing = true;
                     return vec![AppCommand::FetchLibrary];
                 }
@@ -2198,18 +2200,22 @@ pub async fn run_app<B: Backend>(
         if let Some(username) = state.username.clone() {
             let snap_dir = resolved_cache_dir;
             let snap_epoch = state.session_epoch;
+            let mut snapshot_is_fresh = false;
             if let Ok(Some(snapshot)) =
                 tokio::task::spawn_blocking(move || load_library_snapshot(&snap_dir, &username))
                     .await
             {
+                snapshot_is_fresh = is_snapshot_fresh(snapshot.saved_at_unix, current_unix_secs());
                 let snap_cmds = state.apply_event(AppEvent::SnapshotLoaded {
                     epoch: snap_epoch,
                     library: snapshot.library,
                 });
                 execute_commands(&mut state, &mut ctx, snap_cmds);
             }
-            state.syncing = true;
-            execute_commands(&mut state, &mut ctx, vec![AppCommand::FetchLibrary]);
+            if !snapshot_is_fresh {
+                state.syncing = true;
+                execute_commands(&mut state, &mut ctx, vec![AppCommand::FetchLibrary]);
+            }
         }
     }
 
@@ -2636,17 +2642,29 @@ async fn flush_all_progress_on_quit(state: &AppState, ctx: &mut RuntimeContext) 
     };
 
     let pending: Vec<(MediaId, PendingProgress)> = ctx.pending_progress.drain().collect();
-    let futures = pending.into_iter().map(|(media_id, item)| {
-        let client = ctx.client.clone();
-        let token = token.clone();
-        async move {
+    let client = ctx.client.clone();
+    let flush = async move {
+        for (idx, (media_id, item)) in pending.into_iter().enumerate() {
+            if idx > 0 {
+                tokio::time::sleep(QUIT_FLUSH_PACE_DELAY).await;
+            }
             let _ = client
                 .save_entry(&token, media_id, None, Some(item.progress), None)
                 .await;
         }
-    });
+    };
 
-    let _ = tokio::time::timeout(QUIT_FLUSH_TIMEOUT, futures::future::join_all(futures)).await;
+    let _ = tokio::time::timeout(QUIT_FLUSH_TIMEOUT, flush).await;
+}
+
+fn current_unix_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+const fn is_snapshot_fresh(saved_at_unix: u64, now_unix: u64) -> bool {
+    now_unix >= saved_at_unix && (now_unix - saved_at_unix) < STARTUP_SNAPSHOT_FRESHNESS_SECS
 }
 
 fn extract_retry_after(err: &AnilistError) -> Option<u64> {
@@ -3454,10 +3472,14 @@ mod tests {
         assert!(missing_cmds.is_empty());
         assert_eq!(state.active_toast().unwrap().level, ToastLevel::Warning);
 
-        // R triggers FetchLibrary.
+        // R triggers FetchLibrary and deduplicates while a sync is already in-flight.
         let refresh_cmds = state.handle_key(key(KeyCode::Char('R')));
         assert!(state.syncing);
         assert_eq!(refresh_cmds, vec![AppCommand::FetchLibrary]);
+
+        let dup_refresh_cmds = state.handle_key(key(KeyCode::Char('R')));
+        assert!(state.syncing);
+        assert!(dup_refresh_cmds.is_empty());
 
         // 401 unauthorized redirects to Auth screen preserving client_id and clears prior library.
         let old_epoch = state.session_epoch();
@@ -3615,5 +3637,15 @@ mod tests {
             AppCommand::SaveAppConfig(cfg)
                 if cfg.sort_by == SortField::Title && cfg.sort_order == SortDirection::Desc
         )));
+    }
+
+    #[test]
+    fn startup_snapshot_freshness_respects_10_second_window() {
+        assert!(is_snapshot_fresh(1_700_000_000, 1_700_000_000));
+        assert!(is_snapshot_fresh(1_700_000_000, 1_700_000_009));
+        assert!(!is_snapshot_fresh(1_700_000_000, 1_700_000_010));
+        assert!(!is_snapshot_fresh(1_700_000_000, 1_700_000_120));
+        // Future clock skew is treated as stale.
+        assert!(!is_snapshot_fresh(1_700_000_050, 1_700_000_000));
     }
 }
