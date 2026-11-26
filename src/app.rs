@@ -220,7 +220,7 @@ pub enum PendingRollback {
     Delete {
         previous_status: LibraryStatus,
         previous_index: usize,
-        item: AnimeItem,
+        item: Box<AnimeItem>,
         seq: u64,
     },
 }
@@ -1772,7 +1772,7 @@ impl AppState {
                 rollback: PendingRollback::Delete {
                     previous_status,
                     previous_index,
-                    item: removed_item,
+                    item: Box::new(removed_item),
                     seq,
                 },
             }];
@@ -1930,7 +1930,7 @@ impl AppState {
                 ..
             } => {
                 self.library
-                    .restore_item(previous_status, previous_index, item);
+                    .restore_item(previous_status, previous_index, *item);
             }
         }
     }
