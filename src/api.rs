@@ -150,7 +150,9 @@ impl AnilistError {
     #[must_use]
     pub fn is_transient(&self) -> bool {
         match self {
-            Self::Http(err) => err.is_timeout() || err.is_connect(),
+            Self::Http(err) => {
+                err.is_timeout() || err.is_connect() || err.is_request() || err.is_body()
+            }
             Self::HttpStatus { status, .. } => matches!(status, 502..=504),
             _ => false,
         }
@@ -186,6 +188,13 @@ impl AnilistClient {
             endpoint: ANILIST_GRAPHQL_URL.to_owned(),
             rate_limit: Arc::new(Mutex::new(RateLimitTracker::default())),
         })
+    }
+
+    #[cfg(test)]
+    fn with_endpoint(endpoint: String) -> Result<Self, AnilistError> {
+        let mut client = Self::new()?;
+        client.endpoint = endpoint;
+        Ok(client)
     }
 
     /// Returns a reference to the underlying pooled `reqwest::Client` for cover downloads.
@@ -1058,5 +1067,191 @@ mod tests {
         }
         .is_transient());
         assert!(!AnilistError::GraphQl("boom".to_owned()).is_transient());
+    }
+
+    fn minimal_library_json(has_next_chunk: bool, id: u32, title: &str) -> String {
+        format!(
+            r#"{{"data":{{"MediaListCollection":{{"hasNextChunk":{has_next_chunk},"lists":[{{"status":"CURRENT","isCustomList":false,"entries":[{{"id":{id},"status":"CURRENT","progress":1,"score":0,"media":{{"id":{id},"title":{{"userPreferred":"{title}","english":null,"romaji":null}},"siteUrl":null,"episodes":12,"description":null,"status":"FINISHED","averageScore":80,"genres":[],"coverImage":null}}}}]}}]}}}}}}"#
+        )
+    }
+
+    fn http_json_response(status_line: &str, extra_headers: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status_line}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra_headers}\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn drain_http_request(stream: &mut std::net::TcpStream) {
+        use std::io::Read;
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
+        let mut buf = [0u8; 4096];
+        let _ = stream.read(&mut buf);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_full_library_recovers_from_cold_start_connection_drop() {
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().expect("local addr");
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = Arc::clone(&hits);
+        let ok_body = minimal_library_json(false, 101, "Cold Start Anime");
+
+        let server = std::thread::spawn(move || {
+            for attempt in 0..2 {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    server_hits.fetch_add(1, Ordering::SeqCst);
+                    drain_http_request(&mut stream);
+                    if attempt == 0 {
+                        // Simulate abrupt connection drop / EOF on first launch.
+                        drop(stream);
+                    } else {
+                        let resp = http_json_response("200 OK", "", &ok_body);
+                        let _ = stream.write_all(resp.as_bytes());
+                        let _ = stream.flush();
+                    }
+                }
+            }
+        });
+
+        let client = AnilistClient::with_endpoint(format!("http://{addr}/graphql")).unwrap();
+        let lib = client
+            .fetch_full_library("alice", None)
+            .await
+            .expect("should recover on retry after connection drop");
+
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+        assert_eq!(lib.total_count(), 1);
+        assert_eq!(lib.items_for(LibraryStatus::Watching)[0].title, "Cold Start Anime");
+        let _ = server.join();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn fetch_full_library_recovers_from_transient_503() {
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().expect("local addr");
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = Arc::clone(&hits);
+        let ok_body = minimal_library_json(false, 202, "Gateway Recovery");
+
+        let server = std::thread::spawn(move || {
+            for attempt in 0..2 {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    server_hits.fetch_add(1, Ordering::SeqCst);
+                    drain_http_request(&mut stream);
+                    let resp = if attempt == 0 {
+                        http_json_response("503 Service Unavailable", "", "temporarily unavailable")
+                    } else {
+                        http_json_response("200 OK", "", &ok_body)
+                    };
+                    let _ = stream.write_all(resp.as_bytes());
+                    let _ = stream.flush();
+                }
+            }
+        });
+
+        let client = AnilistClient::with_endpoint(format!("http://{addr}/graphql")).unwrap();
+        let lib = client
+            .fetch_full_library("alice", None)
+            .await
+            .expect("should recover on retry after 503");
+
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+        assert_eq!(lib.total_count(), 1);
+        assert_eq!(lib.items_for(LibraryStatus::Watching)[0].title, "Gateway Recovery");
+        let _ = server.join();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn rate_limited_response_is_not_retried_and_sets_local_backoff() {
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().expect("local addr");
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = Arc::clone(&hits);
+
+        let server = std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                server_hits.fetch_add(1, Ordering::SeqCst);
+                drain_http_request(&mut stream);
+                let resp = http_json_response(
+                    "429 Too Many Requests",
+                    "Retry-After: 45\r\nX-RateLimit-Limit: 30\r\nX-RateLimit-Remaining: 0\r\n",
+                    r#"{"data":null,"errors":[{"message":"Too Many Requests."}]}"#,
+                );
+                let _ = stream.write_all(resp.as_bytes());
+                let _ = stream.flush();
+            }
+        });
+
+        let client = AnilistClient::with_endpoint(format!("http://{addr}/graphql")).unwrap();
+        let err = client
+            .fetch_full_library("alice", None)
+            .await
+            .expect_err("429 should not be retried");
+
+        assert!(err.is_rate_limited());
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        assert_eq!(client.rate_limit_info().limit, Some(30));
+        assert_eq!(client.rate_limit_info().remaining, Some(0));
+
+        // Subsequent request is blocked locally without hitting the network.
+        let blocked = client
+            .fetch_full_library("alice", None)
+            .await
+            .expect_err("backoff should block immediately");
+        assert!(blocked.is_rate_limited());
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        let _ = server.join();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn multi_chunk_fetch_paces_requests_and_merges_chunks() {
+        use std::io::Write;
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().expect("local addr");
+        let chunk1 = minimal_library_json(true, 1, "Chunk One");
+        let chunk2 = minimal_library_json(false, 2, "Chunk Two");
+
+        let server = std::thread::spawn(move || {
+            for body in [chunk1, chunk2] {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    drain_http_request(&mut stream);
+                    let resp = http_json_response("200 OK", "", &body);
+                    let _ = stream.write_all(resp.as_bytes());
+                    let _ = stream.flush();
+                }
+            }
+        });
+
+        let client = AnilistClient::with_endpoint(format!("http://{addr}/graphql")).unwrap();
+        let started = Instant::now();
+        let lib = client
+            .fetch_full_library("alice", None)
+            .await
+            .expect("multi-chunk fetch succeeds");
+        let elapsed = started.elapsed();
+
+        assert_eq!(lib.total_count(), 2);
+        assert!(
+            elapsed >= CHUNK_PACE_DELAY,
+            "expected >= {:?} pacing between chunks, got {:?}",
+            CHUNK_PACE_DELAY,
+            elapsed
+        );
+        let _ = server.join();
     }
 }
