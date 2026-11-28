@@ -8,13 +8,11 @@ use std::num::{NonZeroU8, NonZeroU32};
 
 use serde::{Deserialize, Serialize};
 
-/// Strongly-typed AniList media ID (`Media.id`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct MediaId(pub NonZeroU32);
 
 impl MediaId {
-    /// Returns the underlying non-zero integer ID.
     #[must_use]
     pub const fn get(self) -> u32 {
         self.0.get()
@@ -27,13 +25,11 @@ impl fmt::Display for MediaId {
     }
 }
 
-/// Strongly-typed AniList list entry ID (`MediaList.id`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct EntryId(pub NonZeroU32);
 
 impl EntryId {
-    /// Returns the underlying non-zero integer ID.
     #[must_use]
     pub const fn get(self) -> u32 {
         self.0.get()
@@ -46,7 +42,6 @@ impl fmt::Display for EntryId {
     }
 }
 
-/// Personal library list status corresponding to AniList's `MediaListStatus`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LibraryStatus {
     #[serde(rename = "CURRENT")]
@@ -64,7 +59,6 @@ pub enum LibraryStatus {
 }
 
 impl LibraryStatus {
-    /// Canonical display order for the sidebar.
     pub const ALL: [Self; 6] = [
         Self::Watching,
         Self::Planning,
@@ -74,7 +68,6 @@ impl LibraryStatus {
         Self::Repeating,
     ];
 
-    /// Zero-based array index matching [`LibraryStatus::ALL`].
     #[must_use]
     pub const fn index(self) -> usize {
         match self {
@@ -87,7 +80,6 @@ impl LibraryStatus {
         }
     }
 
-    /// Maps a zero-based sidebar index back to [`LibraryStatus`].
     #[must_use]
     pub const fn from_index(idx: usize) -> Option<Self> {
         match idx {
@@ -101,7 +93,6 @@ impl LibraryStatus {
         }
     }
 
-    /// Human-readable category label shown in the UI.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
@@ -111,19 +102,6 @@ impl LibraryStatus {
             Self::Dropped => "Dropped",
             Self::Paused => "Paused",
             Self::Repeating => "Repeating",
-        }
-    }
-
-    /// AniList GraphQL enum name.
-    #[must_use]
-    pub const fn api_name(self) -> &'static str {
-        match self {
-            Self::Watching => "CURRENT",
-            Self::Planning => "PLANNING",
-            Self::Completed => "COMPLETED",
-            Self::Dropped => "DROPPED",
-            Self::Paused => "PAUSED",
-            Self::Repeating => "REPEATING",
         }
     }
 }
@@ -140,7 +118,6 @@ impl fmt::Display for LibraryStatus {
 pub struct ScoreRaw(NonZeroU8);
 
 impl ScoreRaw {
-    /// Constructs a [`ScoreRaw`] for `1..=100` (`0` or `> 100` returns `None`).
     #[must_use]
     pub const fn new(raw: u8) -> Option<Self> {
         if raw >= 1 && raw <= 100 {
@@ -166,7 +143,6 @@ impl ScoreRaw {
         Self::new(rounded as u8)
     }
 
-    /// Returns the underlying `1..=100` score integer.
     #[must_use]
     pub const fn get(self) -> u8 {
         self.0.get()
@@ -179,7 +155,6 @@ impl fmt::Display for ScoreRaw {
     }
 }
 
-/// AniList user scoring format (`MediaListOptions.scoreFormat`), defaulting to `9.8/10`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum ScoreFormat {
     #[default]
@@ -196,7 +171,6 @@ pub enum ScoreFormat {
 }
 
 impl ScoreFormat {
-    /// Canonical order in the settings selector.
     pub const ALL: [Self; 5] = [
         Self::Point10Decimal,
         Self::Point100,
@@ -205,7 +179,6 @@ impl ScoreFormat {
         Self::Point3,
     ];
 
-    /// Config key written to `~/.config/anits/config.toml`.
     #[must_use]
     pub const fn config_key(self) -> &'static str {
         match self {
@@ -217,7 +190,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Parses a `config.toml` key or AniList GraphQL enum name into [`ScoreFormat`].
     #[must_use]
     pub fn from_config_key(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
@@ -232,7 +204,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Descriptive label displayed in the settings modal.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
@@ -244,7 +215,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Compact label for status messages and badges.
     #[must_use]
     pub const fn short_label(self) -> &'static str {
         match self {
@@ -256,13 +226,11 @@ impl ScoreFormat {
         }
     }
 
-    /// Returns `true` for discrete option-list rating formats (`POINT_3`, `POINT_5`).
     #[must_use]
     pub const fn uses_choice_picker(self) -> bool {
         matches!(self, Self::Point3 | Self::Point5)
     }
 
-    /// Converts a `1..=100` score into a `1..=10` integer score.
     #[must_use]
     pub const fn raw_to_point10(raw: ScoreRaw) -> u8 {
         let rounded = (raw.get() as u16 + 5) / 10;
@@ -300,7 +268,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Formats an optional `1..=100` score for the compact table column.
     #[must_use]
     pub fn format_table(self, score: Option<ScoreRaw>) -> Cow<'static, str> {
         let Some(raw) = score else {
@@ -315,7 +282,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Formats an optional `1..=100` score for the Spotlight control bar.
     #[must_use]
     pub fn format_badge(self, score: Option<ScoreRaw>) -> Cow<'static, str> {
         let Some(raw) = score else {
@@ -330,7 +296,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Formats an initial editable string for numeric/decimal rating input.
     #[must_use]
     pub fn format_input_initial(self, score: Option<ScoreRaw>) -> String {
         let Some(raw) = score else {
@@ -345,7 +310,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Steps a score by `delta_steps` in this format (`None` starts from `0`).
     #[must_use]
     pub fn step_raw(self, current: Option<ScoreRaw>, delta_steps: i8) -> Option<ScoreRaw> {
         let step = i16::from(delta_steps);
@@ -378,7 +342,6 @@ impl ScoreFormat {
         }
     }
 
-    /// Parses user input in this format into a [`ScoreUpdate`].
     pub fn parse_input(self, raw_input: &str) -> Result<ScoreUpdate, &'static str> {
         let s = raw_input.trim();
         if s.is_empty() {
@@ -449,7 +412,6 @@ impl ScoreFormat {
     }
 }
 
-/// AniList 3-point smiley rating (`POINT_3`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Point3Score {
     Sad = 1,
@@ -458,21 +420,8 @@ pub enum Point3Score {
 }
 
 impl Point3Score {
-    /// All 3-point score options in UI selection order.
     pub const ALL: [Self; 3] = [Self::Happy, Self::Neutral, Self::Sad];
 
-    /// Converts a raw numeric score from `score(format: POINT_3)` (`0` or out-of-range maps to `None`).
-    #[must_use]
-    pub fn from_raw(raw: f64) -> Option<Self> {
-        match raw.round() as i64 {
-            1 => Some(Self::Sad),
-            2 => Some(Self::Neutral),
-            3 => Some(Self::Happy),
-            _ => None,
-        }
-    }
-
-    /// Maps a `1..=100` [`ScoreRaw`] into its corresponding 3-point smiley bucket.
     #[must_use]
     pub const fn from_score_raw(raw: ScoreRaw) -> Self {
         match raw.get() {
@@ -482,7 +431,6 @@ impl Point3Score {
         }
     }
 
-    /// Numeric `1..=3` value.
     #[must_use]
     pub const fn as_u8(self) -> u8 {
         self as u8
@@ -502,7 +450,6 @@ impl Point3Score {
         }
     }
 
-    /// Emoticon representation matching the existing TUI.
     #[must_use]
     pub const fn face(self) -> &'static str {
         match self {
@@ -512,7 +459,6 @@ impl Point3Score {
         }
     }
 
-    /// Descriptive label for the rating picker modal.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
@@ -529,7 +475,6 @@ impl fmt::Display for Point3Score {
     }
 }
 
-/// Explicit rating mutation intent sent to `SaveMediaListEntry`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScoreUpdate {
     Clear,
@@ -537,7 +482,6 @@ pub enum ScoreUpdate {
 }
 
 impl ScoreUpdate {
-    /// Converts the update intent into AniList's `scoreRaw` integer (`0` clears the rating).
     #[must_use]
     pub const fn to_score_raw(self) -> u8 {
         match self {
@@ -547,18 +491,14 @@ impl ScoreUpdate {
     }
 }
 
-/// Sort direction applied to [`SortField`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum SortDirection {
-    /// Ascending (`A -> Z`, lowest -> highest, oldest -> newest).
     Asc,
-    /// Descending (`Z -> A`, highest -> lowest, newest -> oldest).
     #[default]
     Desc,
 }
 
 impl SortDirection {
-    /// Toggles between [`SortDirection::Asc`] and [`SortDirection::Desc`].
     #[must_use]
     pub const fn toggle(self) -> Self {
         match self {
@@ -567,7 +507,6 @@ impl SortDirection {
         }
     }
 
-    /// Compact arrow glyph for table headers and status badges.
     #[must_use]
     pub const fn arrow(self) -> &'static str {
         match self {
@@ -576,16 +515,6 @@ impl SortDirection {
         }
     }
 
-    /// Human-readable direction label.
-    #[must_use]
-    pub const fn label(self) -> &'static str {
-        match self {
-            Self::Asc => "Ascending",
-            Self::Desc => "Descending",
-        }
-    }
-
-    /// Config key written to `~/.config/anits/config.toml`.
     #[must_use]
     pub const fn config_key(self) -> &'static str {
         match self {
@@ -594,7 +523,6 @@ impl SortDirection {
         }
     }
 
-    /// Parses a `config.toml` sort direction key.
     #[must_use]
     pub fn from_config_key(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
@@ -605,24 +533,17 @@ impl SortDirection {
     }
 }
 
-/// Field used to sort visible anime entries in the library table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum SortField {
-    /// Preserve AniList's default `UPDATED_TIME_DESC` order.
     #[default]
     Updated,
-    /// Alphabetical by anime title (case-insensitive).
     Title,
-    /// User's personal rating (`entry.score`).
     Score,
-    /// Community AniList average score (`average_score`).
     AverageScore,
-    /// Watched episode count (`entry.progress`).
     Progress,
 }
 
 impl SortField {
-    /// Canonical display order in the Sort By picker modal.
     pub const ALL: [Self; 5] = [
         Self::Updated,
         Self::Title,
@@ -631,7 +552,6 @@ impl SortField {
         Self::Progress,
     ];
 
-    /// Zero-based index matching [`SortField::ALL`].
     #[must_use]
     pub const fn index(self) -> usize {
         match self {
@@ -643,7 +563,6 @@ impl SortField {
         }
     }
 
-    /// Maps a zero-based picker index back to [`SortField`].
     #[must_use]
     pub const fn from_index(idx: usize) -> Option<Self> {
         match idx {
@@ -656,7 +575,6 @@ impl SortField {
         }
     }
 
-    /// Natural default direction when switching to this sort field.
     #[must_use]
     pub const fn default_direction(self) -> SortDirection {
         match self {
@@ -667,7 +585,6 @@ impl SortField {
         }
     }
 
-    /// Descriptive label displayed in the Sort By modal.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
@@ -679,7 +596,6 @@ impl SortField {
         }
     }
 
-    /// Compact label for table header badges and toasts.
     #[must_use]
     pub const fn short_label(self) -> &'static str {
         match self {
@@ -691,7 +607,6 @@ impl SortField {
         }
     }
 
-    /// Config key written to `~/.config/anits/config.toml`.
     #[must_use]
     pub const fn config_key(self) -> &'static str {
         match self {
@@ -703,7 +618,6 @@ impl SortField {
         }
     }
 
-    /// Parses a `config.toml` sort field key.
     #[must_use]
     pub fn from_config_key(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
@@ -716,8 +630,6 @@ impl SortField {
         }
     }
 
-    /// Compares two [`AnimeItem`] entries under this sort field and `direction`.
-    ///
     /// Unrated / missing scores (`None`) are always placed after present values so
     /// ascending score sorts surface the lowest rated titles first instead of unrated ones.
     #[must_use]
@@ -739,10 +651,10 @@ impl SortField {
                 };
                 directed.then_with(|| a.id.get().cmp(&b.id.get()))
             }
-            Self::Score => compare_optional_ord(a.entry.score, b.entry.score, direction)
+            Self::Score => compare_optional_none_last(a.entry.score, b.entry.score, direction)
                 .then_with(title_tiebreak),
             Self::AverageScore => {
-                compare_optional_ord(a.average_score, b.average_score, direction)
+                compare_optional_none_last(a.average_score, b.average_score, direction)
                     .then_with(title_tiebreak)
             }
             Self::Progress => {
@@ -757,7 +669,7 @@ impl SortField {
     }
 }
 
-fn compare_optional_ord<T: Ord>(
+fn compare_optional_none_last<T: Ord>(
     a: Option<T>,
     b: Option<T>,
     direction: SortDirection,
@@ -801,7 +713,6 @@ fn cmp_case_insensitive(a: &str, b: &str) -> Ordering {
     }
 }
 
-/// User-specific progress, status, and score for an anime in their library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LibraryEntry {
     pub id: Option<EntryId>,
@@ -810,7 +721,6 @@ pub struct LibraryEntry {
     pub score: Option<ScoreRaw>,
 }
 
-/// Normalized anime item held in memory for zero-latency rendering and filtering.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnimeItem {
     pub id: MediaId,
@@ -830,7 +740,6 @@ pub struct AnimeItem {
 }
 
 impl AnimeItem {
-    /// Constructs a normalized [`AnimeItem`] with its lowercase search haystack precomputed.
     #[allow(
         clippy::too_many_arguments,
         reason = "constructor initializes all normalized fields and precomputes the search index"
@@ -867,7 +776,6 @@ impl AnimeItem {
         item
     }
 
-    /// Rebuilds the precomputed lowercase search haystack from title, alt title, and genres.
     pub fn rebuild_search_index(&mut self) {
         let genres_len: usize = self.genres.iter().map(|g| g.len() + 1).sum();
         let cap = self.title.len()
@@ -888,14 +796,6 @@ impl AnimeItem {
         }
     }
 
-    /// Consumes `self`, builds the search haystack, and returns the item.
-    #[must_use]
-    pub fn with_search_index(mut self) -> Self {
-        self.rebuild_search_index();
-        self
-    }
-
-    /// Clamps episode progress against `self.episodes` when known.
     #[must_use]
     pub fn clamp_progress(&self, next: u32) -> u32 {
         match self.episodes {
@@ -904,7 +804,6 @@ impl AnimeItem {
         }
     }
 
-    /// Formats progress as `Ep X / Y` (or `Ep X / ?` for airing/unknown totals).
     #[must_use]
     pub fn progress_display(&self) -> String {
         match self.episodes {
@@ -913,7 +812,6 @@ impl AnimeItem {
         }
     }
 
-    /// Formats AniList release status enums (e.g. `NOT_YET_RELEASED` -> `Not Yet Released`).
     #[must_use]
     pub fn release_status_display(&self) -> Cow<'static, str> {
         match self.release_status.as_str() {
@@ -955,24 +853,22 @@ impl AnimeItem {
         }
     }
 
-    /// Matches a pre-trimmed, already-lowercased query against the precomputed haystack.
     #[must_use]
-    pub fn matches_normalized(&self, needle_lower: &str) -> bool {
-        if needle_lower.is_empty() {
+    pub fn matches_normalized(&self, lowercase_query: &str) -> bool {
+        if lowercase_query.is_empty() {
             return true;
         }
-        self.search_haystack.contains(needle_lower)
+        self.search_haystack.contains(lowercase_query)
     }
 
-    /// Returns `true` if `query` matches title, alternative title, or any genre (case-insensitive).
     #[must_use]
     pub fn matches_filter(&self, query: &str) -> bool {
         let needle = query.trim();
         if needle.is_empty() {
             return true;
         }
-        let needle_lower = needle.to_lowercase();
-        self.matches_normalized(&needle_lower)
+        let lowercase_query = needle.to_lowercase();
+        self.matches_normalized(&lowercase_query)
     }
 }
 
@@ -990,7 +886,6 @@ fn push_lowercased(input: &str, dst: &mut String) {
     }
 }
 
-/// In-memory personal library partitioned into a fixed 6-slot array by [`LibraryStatus`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LibraryCollection {
     lists: [Vec<AnimeItem>; 6],
@@ -999,7 +894,6 @@ pub struct LibraryCollection {
 }
 
 impl LibraryCollection {
-    /// Builds a [`LibraryCollection`] from pre-grouped lists.
     #[must_use]
     pub fn from_lists(lists: HashMap<LibraryStatus, Vec<AnimeItem>>) -> Self {
         let mut arr: [Vec<AnimeItem>; 6] = Default::default();
@@ -1015,7 +909,6 @@ impl LibraryCollection {
         }
     }
 
-    /// Builds a [`LibraryCollection`] directly from a 6-list array and optional AniList score format.
     #[must_use]
     pub fn from_array(mut lists: [Vec<AnimeItem>; 6], score_format: Option<ScoreFormat>) -> Self {
         for bucket in &mut lists {
@@ -1029,7 +922,6 @@ impl LibraryCollection {
         }
     }
 
-    /// Rebuilds precomputed search indexes across all items (for example after snapshot load).
     pub fn rebuild_search_indexes(&mut self) {
         for bucket in &mut self.lists {
             for item in bucket {
@@ -1038,57 +930,30 @@ impl LibraryCollection {
         }
     }
 
-    /// Returns all items in `status` in display order.
     #[must_use]
     pub fn items_for(&self, status: LibraryStatus) -> &[AnimeItem] {
         &self.lists[status.index()]
     }
 
-    /// Returns a mutable `Vec<AnimeItem>` for `status`.
     pub fn items_for_mut(&mut self, status: LibraryStatus) -> &mut Vec<AnimeItem> {
         &mut self.lists[status.index()]
     }
 
-    /// Returns the number of entries in `status`.
     #[must_use]
     pub fn count_for(&self, status: LibraryStatus) -> usize {
         self.lists[status.index()].len()
     }
 
-    /// Returns total number of anime entries across all 6 lists.
     #[must_use]
     pub fn total_count(&self) -> usize {
         self.lists.iter().map(Vec::len).sum()
     }
 
-    /// Returns `true` when all 6 library lists are empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.lists.iter().all(Vec::is_empty)
     }
 
-    /// Filters items in `status` in memory with zero network calls.
-    #[must_use]
-    pub fn filter_in_status(&self, status: LibraryStatus, query: &str) -> Vec<&AnimeItem> {
-        let needle_lower = query.trim().to_lowercase();
-        self.items_for(status)
-            .iter()
-            .filter(|item| item.matches_normalized(&needle_lower))
-            .collect()
-    }
-
-    /// Filters across all personal library lists in memory.
-    #[must_use]
-    pub fn filter_all(&self, query: &str) -> Vec<&AnimeItem> {
-        let needle_lower = query.trim().to_lowercase();
-        LibraryStatus::ALL
-            .into_iter()
-            .flat_map(|status| self.items_for(status))
-            .filter(|item| item.matches_normalized(&needle_lower))
-            .collect()
-    }
-
-    /// Finds `(status, index)` for `media_id` if present anywhere in the library.
     #[must_use]
     pub fn find_by_media_id(&self, media_id: MediaId) -> Option<(LibraryStatus, usize)> {
         for status in LibraryStatus::ALL {
@@ -1102,20 +967,17 @@ impl LibraryCollection {
         None
     }
 
-    /// Returns an immutable reference to the item matching `media_id`.
     #[must_use]
     pub fn get(&self, media_id: MediaId) -> Option<&AnimeItem> {
         let (status, idx) = self.find_by_media_id(media_id)?;
         self.lists[status.index()].get(idx)
     }
 
-    /// Returns a mutable reference to the item matching `media_id`.
     pub fn get_mut(&mut self, media_id: MediaId) -> Option<&mut AnimeItem> {
         let (status, idx) = self.find_by_media_id(media_id)?;
         self.lists[status.index()].get_mut(idx)
     }
 
-    /// Moves an item from `from` to `to`, updating its `entry.status`.
     pub fn move_item(&mut self, media_id: MediaId, from: LibraryStatus, to: LibraryStatus) -> bool {
         if from == to {
             return false;
@@ -1130,14 +992,12 @@ impl LibraryCollection {
         true
     }
 
-    /// Removes an item anywhere in the library and returns its previous `(status, index, item)`.
     pub fn remove_item(&mut self, media_id: MediaId) -> Option<(LibraryStatus, usize, AnimeItem)> {
         let (status, idx) = self.find_by_media_id(media_id)?;
         let item = self.lists[status.index()].remove(idx);
         Some((status, idx, item))
     }
 
-    /// Restores an item into `status` at `index` (clamped to `len`) during rollback.
     pub fn restore_item(&mut self, status: LibraryStatus, index: usize, mut item: AnimeItem) {
         item.entry.status = status;
         let bucket = &mut self.lists[status.index()];
@@ -1171,7 +1031,7 @@ pub fn clean_description(raw: Option<&str>) -> String {
         }
 
         if bytes[i] == b'&' {
-            if let Some((decoded, consumed)) = decode_entity(&input[i..]) {
+            if let Some((decoded, consumed)) = decode_html_entity(&input[i..]) {
                 if decoded == '\n' {
                     push_newline(&mut out, &mut newline_run);
                 } else {
@@ -1183,18 +1043,17 @@ pub fn clean_description(raw: Option<&str>) -> String {
             }
         }
 
-        // Advance by the next UTF-8 char boundary.
         let ch = input[i..]
             .chars()
             .next()
             .unwrap_or('\u{FFFD}');
-        if ch == '\r' {
-            // Skip CR; LF handles line breaks uniformly.
-        } else if ch == '\n' {
-            push_newline(&mut out, &mut newline_run);
-        } else {
-            newline_run = 0;
-            out.push(ch);
+        match ch {
+            '\r' => {}
+            '\n' => push_newline(&mut out, &mut newline_run),
+            _ => {
+                newline_run = 0;
+                out.push(ch);
+            }
         }
         i += ch.len_utf8();
     }
@@ -1247,7 +1106,7 @@ fn is_br_tag(tag_body: &str) -> bool {
         && (bytes[2].is_ascii_whitespace() || bytes[2] == b'/')
 }
 
-fn decode_entity(slice: &str) -> Option<(char, usize)> {
+fn decode_html_entity(slice: &str) -> Option<(char, usize)> {
     const ENTITIES: &[(&str, char)] = &[
         ("&amp;", '&'),
         ("&lt;", '<'),
@@ -1338,12 +1197,6 @@ mod tests {
             Ok(ScoreUpdate::Set(ScoreRaw::new(90).unwrap()))
         );
 
-        assert_eq!(Point3Score::from_raw(0.0), None);
-        assert_eq!(Point3Score::from_raw(1.0), Some(Point3Score::Sad));
-        assert_eq!(Point3Score::from_raw(2.0), Some(Point3Score::Neutral));
-        assert_eq!(Point3Score::from_raw(3.0), Some(Point3Score::Happy));
-        assert_eq!(Point3Score::from_raw(4.0), None);
-
         assert_eq!(Point3Score::Sad.as_score_raw().get(), 35);
         assert_eq!(Point3Score::Neutral.as_score_raw().get(), 60);
         assert_eq!(Point3Score::Happy.as_score_raw().get(), 85);
@@ -1383,51 +1236,34 @@ mod tests {
     }
 
     #[test]
-    fn local_library_filter_matches_title_alt_title_and_genres() {
-        let mut lists = HashMap::new();
-        lists.insert(
-            LibraryStatus::Watching,
-            vec![
-                sample_item(
-                    1,
-                    "Frieren: Beyond Journey's End",
-                    Some("Sousou no Frieren"),
-                    &["Adventure", "Drama"],
-                    Some(28),
-                ),
-                sample_item(
-                    2,
-                    "Bocchi the Rock!",
-                    None,
-                    &["Comedy", "Music"],
-                    Some(12),
-                ),
-            ],
+    fn local_filter_matches_title_alt_title_and_genres() {
+        let frieren = sample_item(
+            1,
+            "Frieren: Beyond Journey's End",
+            Some("Sousou no Frieren"),
+            &["Adventure", "Drama"],
+            Some(28),
         );
-        lists.insert(
-            LibraryStatus::Completed,
-            vec![sample_item(
-                3,
-                "Steins;Gate",
-                None,
-                &["Sci-Fi", "Thriller"],
-                Some(24),
-            )],
+        let bocchi = sample_item(
+            2,
+            "Bocchi the Rock!",
+            None,
+            &["Comedy", "Music"],
+            Some(12),
+        );
+        let steins = sample_item(
+            3,
+            "Steins;Gate",
+            None,
+            &["Sci-Fi", "Thriller"],
+            Some(24),
         );
 
-        let lib = LibraryCollection::from_lists(lists);
-        assert_eq!(lib.total_count(), 3);
-        assert_eq!(lib.filter_in_status(LibraryStatus::Watching, "").len(), 2);
-        assert_eq!(
-            lib.filter_in_status(LibraryStatus::Watching, "sousou")
-                .len(),
-            1
-        );
-        assert_eq!(
-            lib.filter_in_status(LibraryStatus::Watching, "MUSIC").len(),
-            1
-        );
-        assert_eq!(lib.filter_all("sci-fi").len(), 1);
+        assert!(frieren.matches_filter(""));
+        assert!(frieren.matches_filter("sousou"));
+        assert!(!frieren.matches_filter("music"));
+        assert!(bocchi.matches_filter("MUSIC"));
+        assert!(steins.matches_filter("sci-fi"));
     }
 
     #[test]
