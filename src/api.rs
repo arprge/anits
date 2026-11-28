@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::num::NonZeroU32;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use reqwest::StatusCode;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
@@ -357,7 +357,7 @@ impl AnilistClient {
 
         let resp = req.send().await?;
         let status = resp.status();
-        let now_unix = current_unix_secs();
+        let now_unix = crate::current_unix_secs();
         let (info, retry_hint) = parse_rate_limit_headers(resp.headers(), now_unix);
         self.record_rate_limit(status, info, retry_hint);
 
@@ -461,12 +461,6 @@ fn build_save_entry_vars(
         progress,
         score_raw: score.map(ScoreUpdate::to_score_raw),
     }
-}
-
-fn current_unix_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs())
 }
 
 fn parse_header_u32(headers: &HeaderMap, name: &str) -> Option<u32> {

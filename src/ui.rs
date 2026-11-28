@@ -1703,7 +1703,6 @@ fn render_footer(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
 
     if let Some((message, level)) = view.toast {
         let (prefix, color) = match level {
-            ToastLevel::Info => ("  ℹ ", palette.secondary),
             ToastLevel::Success => ("  ✓ ", palette.success),
             ToastLevel::Warning => ("  ! ", palette.warning),
             ToastLevel::Error => ("  ✗ ", palette.error),
@@ -1891,22 +1890,7 @@ fn render_status_picker_modal(
     for (idx, status) in LibraryStatus::ALL.into_iter().enumerate() {
         let is_sel = idx == selected_idx;
         let is_cur = current_status == Some(status);
-        let prefix = if is_sel { "▌ " } else { "  " };
-        let suffix = if is_cur { " ✓" } else { "" };
-        let text = format!("{prefix}{}{suffix}", status.label());
-        let style = if is_sel {
-            Style::default()
-                .bg(palette.accent)
-                .fg(contrast_fg_on(palette.accent, palette))
-                .add_modifier(Modifier::BOLD)
-        } else if is_cur {
-            Style::default()
-                .fg(palette.accent)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(palette.text)
-        };
-        items.push(ListItem::new(Line::styled(text, style)));
+        items.push(modal_option_item(status.label(), is_sel, is_cur, palette));
     }
 
     let remove_sel = selected_idx == 6;
@@ -2810,7 +2794,6 @@ mod tests {
         let palette = ThemePalette::from_name("gruvbox");
 
         for (level, msg) in [
-            (ToastLevel::Info, "Loaded cached library"),
             (ToastLevel::Success, "Progress updated"),
             (ToastLevel::Warning, "Rate limit nearly reached"),
             (ToastLevel::Error, "Network timeout"),

@@ -12,9 +12,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui_image::picker::Picker;
 
-use anits::api::AnilistClient;
-use anits::app;
-use anits::config::{load_app_config, load_auth_session};
+use anits::{AnilistClient, load_app_config, load_auth_session, run_app};
 
 fn restore_terminal() {
     let _ = disable_raw_mode();
@@ -56,7 +54,7 @@ async fn main() -> Result<()> {
     // before spawning crossterm's EventStream.
     let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::from_fontsize((8, 16)));
 
-    let run_result = app::run_app(&mut terminal, app_config, auth, client, picker).await;
+    let run_result = run_app(&mut terminal, app_config, auth, client, picker).await;
 
     drop(_guard);
     run_result

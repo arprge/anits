@@ -1,7 +1,7 @@
 //! Application state machine, optimistic mutation reconciliation, and async event loop.
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use crossterm::event::{
     Event as CrosstermEvent, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
@@ -169,7 +169,6 @@ pub enum Screen {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastLevel {
-    Info,
     Success,
     Warning,
     Error,
@@ -351,6 +350,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    #[cfg(test)]
     #[must_use]
     pub fn new(palette: ThemePalette, auth: AuthSession) -> Self {
         Self::new_with_config(palette, AppConfig::default(), auth)
@@ -435,6 +435,7 @@ impl AppState {
     }
 
     /// Monotonic epoch used to fence stale async responses across logout/re-auth.
+    #[cfg(test)]
     #[must_use]
     pub const fn session_epoch(&self) -> u64 {
         self.session_epoch
@@ -451,6 +452,7 @@ impl AppState {
         items
     }
 
+    #[cfg(test)]
     #[must_use]
     pub fn visible_len(&self) -> usize {
         self.visible_rows.len()
@@ -1970,7 +1972,7 @@ impl AppState {
 
     fn set_toast(&mut self, message: String, level: ToastLevel) {
         let duration = match level {
-            ToastLevel::Info | ToastLevel::Success => TOAST_SHORT,
+            ToastLevel::Success => TOAST_SHORT,
             ToastLevel::Warning | ToastLevel::Error => TOAST_LONG,
         };
         self.toast = Some(Toast {
@@ -2176,7 +2178,8 @@ pub async fn run_app<B: Backend>(
                 tokio::task::spawn_blocking(move || load_library_snapshot(&snap_dir, &username))
                     .await
             {
-                snapshot_is_fresh = is_snapshot_fresh(snapshot.saved_at_unix, current_unix_secs());
+                snapshot_is_fresh =
+                    is_snapshot_fresh(snapshot.saved_at_unix, crate::current_unix_secs());
                 let snap_cmds = state.apply_event(AppEvent::SnapshotLoaded {
                     epoch: snap_epoch,
                     library: snapshot.library,
@@ -2626,12 +2629,6 @@ async fn flush_all_progress_on_quit(state: &AppState, ctx: &mut RuntimeContext) 
     };
 
     let _ = tokio::time::timeout(QUIT_FLUSH_TIMEOUT, flush).await;
-}
-
-fn current_unix_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs())
 }
 
 const fn is_snapshot_fresh(saved_at_unix: u64, now_unix: u64) -> bool {
