@@ -18,7 +18,6 @@ use tokio::sync::{Semaphore, mpsc};
 
 use crate::domain::{LibraryCollection, MediaId};
 
-/// Current schema version for serialized [`LibrarySnapshot`] files on disk.
 pub const SNAPSHOT_SCHEMA_VERSION: u32 = 2;
 
 const DEFAULT_COVER_CACHE_CAPACITY: usize = 64;
@@ -26,7 +25,6 @@ const MAX_CONCURRENT_COVER_DOWNLOADS: usize = 4;
 
 static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// Errors returned when serializing or writing cached library snapshots.
 #[derive(Debug, Error)]
 pub enum CacheError {
     #[error("I/O error accessing {path}: {source}")]
@@ -41,7 +39,6 @@ pub enum CacheError {
     Join(#[from] tokio::task::JoinError),
 }
 
-/// Versioned on-disk library snapshot used for instant stale-while-revalidate startup.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibrarySnapshot {
     pub version: u32,
@@ -50,7 +47,6 @@ pub struct LibrarySnapshot {
     pub library: LibraryCollection,
 }
 
-/// Sanitizes an AniList username into a safe lowercase ASCII filename stem.
 #[must_use]
 pub fn sanitize_username(username: &str) -> String {
     let trimmed = username.trim();
@@ -69,15 +65,12 @@ pub fn sanitize_username(username: &str) -> String {
     sanitized
 }
 
-/// Returns the disk path for `username`'s cached library snapshot inside `cache_dir`.
 #[must_use]
 pub fn snapshot_path(cache_dir: &Path, username: &str) -> PathBuf {
     cache_dir.join(format!("library_{}.json", sanitize_username(username)))
 }
 
-/// Synchronously loads a cached [`LibrarySnapshot`] at startup.
-///
-/// Returns `None` if the file is missing, unreadable, invalid JSON, has a mismatched
+/// Returns `None` if the snapshot is missing, unreadable, invalid JSON, has a mismatched
 /// schema version, or belongs to a different username. Rebuilds search indexes before returning.
 #[must_use]
 pub fn load_library_snapshot(cache_dir: &Path, username: &str) -> Option<LibrarySnapshot> {
@@ -93,7 +86,6 @@ pub fn load_library_snapshot(cache_dir: &Path, username: &str) -> Option<Library
     Some(snap)
 }
 
-/// Atomically writes `library` as a JSON [`LibrarySnapshot`] inside `cache_dir`.
 pub async fn save_library_snapshot(
     cache_dir: PathBuf,
     username: String,
@@ -121,19 +113,16 @@ pub async fn save_library_snapshot(
     write_file_atomic(&cache_dir, &dest, "library", &bytes).await
 }
 
-/// Removes `username`'s cached library snapshot on a best-effort basis (for logout).
 pub fn remove_library_snapshot(cache_dir: &Path, username: &str) {
     let path = snapshot_path(cache_dir, username);
     let _ = std::fs::remove_file(path);
 }
 
-/// Completion event produced by background cover loading or resizing tasks.
 pub struct CoverLoaded {
     pub media_id: MediaId,
     pub result: Result<StatefulProtocol, String>,
 }
 
-/// Bounded LRU cache of encoded cover protocols with in-flight and failure deduplication.
 pub struct CoverCache {
     entries: LruCache<MediaId, StatefulProtocol>,
     in_flight: HashSet<MediaId>,
@@ -147,7 +136,6 @@ impl Default for CoverCache {
 }
 
 impl CoverCache {
-    /// Creates a bounded [`CoverCache`] with capacity `capacity` (clamped to at least 1).
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         let cap = NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::MIN);
@@ -158,25 +146,21 @@ impl CoverCache {
         }
     }
 
-    /// Returns a mutable reference to a cached protocol, promoting it to most-recently-used.
     pub fn get_mut(&mut self, id: MediaId) -> Option<&mut StatefulProtocol> {
         self.entries.get_mut(&id)
     }
 
-    /// Pops a cached protocol out of the cache (for off-thread resize/re-encoding).
     pub fn take(&mut self, id: MediaId) -> Option<StatefulProtocol> {
         self.entries.pop(&id)
     }
 
-    /// Inserts a ready [`StatefulProtocol`] into the cache and clears any loading/failed flags.
     pub fn insert(&mut self, id: MediaId, proto: StatefulProtocol) {
         self.in_flight.remove(&id);
         self.failed.remove(&id);
         self.entries.put(id, proto);
     }
 
-    /// Marks `id` as in-flight and returns `true` unless already cached, in-flight, or failed.
-    pub fn mark_in_flight(&mut self, id: MediaId) -> bool {
+    pub fn try_mark_in_flight(&mut self, id: MediaId) -> bool {
         if self.entries.contains(&id)
             || self.in_flight.contains(&id)
             || self.failed.contains(&id)
@@ -187,43 +171,33 @@ impl CoverCache {
         true
     }
 
-    /// Removes `id` from the in-flight set.
-    pub fn finish_in_flight(&mut self, id: MediaId) {
-        self.in_flight.remove(&id);
-    }
-
-    /// Marks `id` as failed and removes it from the in-flight set.
     pub fn mark_failed(&mut self, id: MediaId) {
         self.in_flight.remove(&id);
         self.failed.insert(id);
     }
 
-    /// Clears recorded cover failures so previously failed covers can be retried.
     pub fn clear_failures(&mut self) {
         self.failed.clear();
     }
 
-    /// Drops all cached covers, in-flight markers, and failure markers.
     pub fn clear(&mut self) {
         self.entries.clear();
         self.in_flight.clear();
         self.failed.clear();
     }
 
-    /// Returns `true` if `id` is currently stored in the LRU cache.
+    #[cfg(test)]
     #[must_use]
     pub fn contains(&self, id: MediaId) -> bool {
         self.entries.contains(&id)
     }
 
-    /// Returns `true` if `id` currently has a pending load or re-encode request.
     #[must_use]
     pub fn is_loading(&self, id: MediaId) -> bool {
         self.in_flight.contains(&id)
     }
 }
 
-/// Asynchronous cover fetcher and off-thread image decoder/encoder.
 #[derive(Clone)]
 pub struct CoverLoader {
     http: reqwest::Client,
@@ -233,7 +207,6 @@ pub struct CoverLoader {
 }
 
 impl CoverLoader {
-    /// Creates a [`CoverLoader`] backed by `http`, caching raw images in `covers_dir`.
     #[must_use]
     pub fn new(http: reqwest::Client, covers_dir: PathBuf, picker: Picker) -> Self {
         Self {
@@ -244,13 +217,11 @@ impl CoverLoader {
         }
     }
 
-    /// Returns the disk cache path for `media_id`'s cover bytes.
     #[must_use]
     pub fn cover_path(&self, media_id: MediaId) -> PathBuf {
         self.covers_dir.join(format!("{}.img", media_id.get()))
     }
 
-    /// Spawns a background task that loads or downloads, decodes, and pre-encodes a cover image.
     pub fn request_cover(
         &self,
         media_id: MediaId,
@@ -279,7 +250,6 @@ impl CoverLoader {
         });
     }
 
-    /// Moves an existing [`StatefulProtocol`] off-thread to re-encode it for `target_area`.
     pub fn reencode_cover(
         media_id: MediaId,
         mut proto: StatefulProtocol,
@@ -436,7 +406,7 @@ mod tests {
             .expect("system clock after unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "anilist_tui_cache_test_{label}_{}_{nanos}_{seq}",
+            "anits_cache_test_{label}_{}_{nanos}_{seq}",
             std::process::id()
         ))
     }
@@ -548,19 +518,16 @@ mod tests {
         let raw = std::fs::read(&path).expect("read saved snapshot");
         let mut snap: LibrarySnapshot = serde_json::from_slice(&raw).expect("parse snapshot");
 
-        // Username mismatch on same file path.
         assert!(load_library_snapshot(&dir, "Bob").is_none());
         snap.username = "Charlie".to_owned();
         std::fs::write(&path, serde_json::to_vec(&snap).expect("serialize")).expect("write");
         assert!(load_library_snapshot(&dir, "Alice").is_none());
 
-        // Schema version mismatch.
         snap.username = "Alice".to_owned();
         snap.version = SNAPSHOT_SCHEMA_VERSION + 1;
         std::fs::write(&path, serde_json::to_vec(&snap).expect("serialize")).expect("write");
         assert!(load_library_snapshot(&dir, "Alice").is_none());
 
-        // Invalid JSON.
         std::fs::write(&path, b"{not valid json").expect("write invalid json");
         assert!(load_library_snapshot(&dir, "Alice").is_none());
 
@@ -574,25 +541,19 @@ mod tests {
         let id2 = media_id(2);
         let id3 = media_id(3);
 
-        // In-flight deduplication and completion.
-        assert!(cache.mark_in_flight(id1));
+        assert!(cache.try_mark_in_flight(id1));
         assert!(cache.is_loading(id1));
-        assert!(!cache.mark_in_flight(id1));
-        cache.finish_in_flight(id1);
-        assert!(!cache.is_loading(id1));
+        assert!(!cache.try_mark_in_flight(id1));
 
-        // Failure blocks retries until clear_failures().
-        assert!(cache.mark_in_flight(id1));
         cache.mark_failed(id1);
         assert!(!cache.is_loading(id1));
-        assert!(!cache.mark_in_flight(id1));
+        assert!(!cache.try_mark_in_flight(id1));
         cache.clear_failures();
-        assert!(cache.mark_in_flight(id1));
+        assert!(cache.try_mark_in_flight(id1));
 
-        // Insert id1 and id2; touch id1 so id2 becomes LRU and gets evicted by id3.
         cache.insert(id1, dummy_protocol());
         assert!(!cache.is_loading(id1));
-        assert!(!cache.mark_in_flight(id1));
+        assert!(!cache.try_mark_in_flight(id1));
         cache.insert(id2, dummy_protocol());
 
         assert!(cache.get_mut(id1).is_some());
@@ -602,11 +563,9 @@ mod tests {
         assert!(!cache.contains(id2));
         assert!(cache.contains(id3));
 
-        // Take removes from cache and allows re-inserting or re-fetching.
         assert!(cache.take(id1).is_some());
         assert!(!cache.contains(id1));
 
-        // Zero capacity clamps to 1 rather than panicking.
         let mut min_cache = CoverCache::new(0);
         min_cache.insert(id1, dummy_protocol());
         min_cache.insert(id2, dummy_protocol());

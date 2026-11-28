@@ -77,7 +77,6 @@ struct LibraryView<'a> {
     selected_item: Option<&'a AnimeItem>,
 }
 
-/// Renders the entire `anits` frame for the current [`AppState`].
 pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
     let root = frame.area();
     fill_background(frame, root, state.palette);
@@ -111,8 +110,8 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
                 let mut total_titles = 0usize;
                 let mut episodes_watched = 0u64;
                 let mut rated_count = 0usize;
-                let mut avg_sum = 0u64;
-                let mut avg_n = 0u64;
+                let mut avg_score_sum = 0u64;
+                let mut avg_score_count = 0u64;
 
                 for status in LibraryStatus::ALL {
                     let items = state.library.items_for(status);
@@ -124,8 +123,8 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
                             rated_count += 1;
                         }
                         if let Some(avg) = item.average_score {
-                            avg_sum += u64::from(avg);
-                            avg_n += 1;
+                            avg_score_sum += u64::from(avg);
+                            avg_score_count += 1;
                         }
                     }
                 }
@@ -134,7 +133,8 @@ pub fn render(frame: &mut Frame<'_>, state: &mut AppState) {
                     total_titles,
                     episodes_watched,
                     rated_count,
-                    mean_avg_score: (avg_n > 0).then(|| (avg_sum / avg_n) as u8),
+                    mean_avg_score: (avg_score_count > 0)
+                        .then(|| (avg_score_sum / avg_score_count) as u8),
                 };
 
                 let visible_items = state.visible_items();
@@ -272,15 +272,15 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
         [root, Rect::default()]
     };
 
-    let desired_w = if main_area.width > 80 {
+    let modal_width = if main_area.width > 80 {
         76
     } else if main_area.width > 8 {
         main_area.width.saturating_sub(2)
     } else {
         main_area.width
     };
-    let desired_h: u16 = if view.error.is_some() { 20 } else { 18 };
-    let modal_area = centered_rect(main_area, desired_w, desired_h);
+    let modal_height: u16 = if view.error.is_some() { 20 } else { 18 };
+    let modal_area = centered_rect(main_area, modal_width, modal_height);
 
     let outer_block = Block::bordered()
         .border_type(BorderType::Rounded)
@@ -350,11 +350,10 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
         };
         frame.render_widget(Paragraph::new(note_line).wrap(Wrap { trim: true }), note_area);
 
-        // 01: Client ID
-        let cid_focused = matches!(view.focused, AuthField::ClientId);
-        let cid_line = if view.client_id.is_empty() {
+        let client_id_focused = matches!(view.focused, AuthField::ClientId);
+        let client_id_line = if view.client_id.is_empty() {
             let mut spans = Vec::with_capacity(2);
-            if cid_focused {
+            if client_id_focused {
                 spans.push(Span::styled("▏", Style::default().fg(palette.accent)));
             }
             spans.push(Span::styled(
@@ -365,7 +364,7 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
         } else {
             let mut spans = Vec::with_capacity(2);
             spans.push(Span::styled(view.client_id, Style::default().fg(palette.text)));
-            if cid_focused {
+            if client_id_focused {
                 spans.push(Span::styled("▏", Style::default().fg(palette.accent)));
             }
             Line::from(spans)
@@ -375,12 +374,11 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
             step1_area,
             " 01 Client ID ",
             None,
-            cid_line,
-            cid_focused,
+            client_id_line,
+            client_id_focused,
             palette,
         );
 
-        // 02: OAuth URL link box
         let url_focused = matches!(view.focused, AuthField::OpenUrl);
         let url_line = match view.oauth_url {
             Some(url) => Line::styled(
@@ -404,12 +402,11 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
             palette,
         );
 
-        // 03: Access Token masked with '•'
-        let tok_focused = matches!(view.focused, AuthField::Token);
+        let token_focused = matches!(view.focused, AuthField::Token);
         let masked_token = mask_secret(view.token);
-        let tok_line = if masked_token.is_empty() {
+        let token_line = if masked_token.is_empty() {
             let mut spans = Vec::with_capacity(2);
-            if tok_focused {
+            if token_focused {
                 spans.push(Span::styled("▏", Style::default().fg(palette.accent)));
             }
             spans.push(Span::styled(
@@ -420,7 +417,7 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
         } else {
             let mut spans = Vec::with_capacity(2);
             spans.push(Span::styled(masked_token, Style::default().fg(palette.text)));
-            if tok_focused {
+            if token_focused {
                 spans.push(Span::styled("▏", Style::default().fg(palette.accent)));
             }
             Line::from(spans)
@@ -435,12 +432,11 @@ fn render_auth_view(frame: &mut Frame<'_>, root: Rect, view: &AuthView<'_>) {
             step3_area,
             " 03 Access Token ",
             step3_hint,
-            tok_line,
-            tok_focused,
+            token_line,
+            token_focused,
             palette,
         );
 
-        // 04: Submit button
         let submit_focused = matches!(view.focused, AuthField::Submit);
         let btn_label = if view.submitting {
             "Verifying token..."
@@ -647,7 +643,6 @@ fn render_left_workspace(
         return None;
     }
 
-    // Details Spotlight on TOP (~44%), Library Table BELOW (~56%).
     let details_pct = if content_area.height >= 24 { 44 } else { 46 };
     let table_pct = 100 - details_pct;
     let [details_area, table_area] = Layout::vertical([
@@ -691,7 +686,6 @@ fn render_top_bar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
         return;
     }
 
-    // Left: minimal brand + user handle
     let mut brand_spans = Vec::with_capacity(4);
     brand_spans.push(Span::styled(
         "◈ ",
@@ -720,7 +714,6 @@ fn render_top_bar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
         0
     };
 
-    // Right: calm status indicator + low quota alert
     let mut right_spans = Vec::with_capacity(4);
     if view.syncing {
         let glyph = SPINNER_FRAMES
@@ -768,7 +761,6 @@ fn render_top_bar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
         frame.render_widget(Paragraph::new(brand_line), brand_area);
     }
 
-    // Center: quiet inline filter input
     let scope_text = match view.filter_scope {
         FilterScope::CurrentList => "List",
         FilterScope::AllLists => "All",
@@ -863,7 +855,6 @@ fn render_sidebar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
 
     let width = inner.width as usize;
 
-    // Partition sidebar cleanly: Lists at top, calm Overview in middle space, Sign Out pinned bottom.
     let show_overview = inner.height >= 14;
     let show_logout_divider = inner.height >= 9;
     let logout_h = if show_logout_divider { 2 } else { 1 };
@@ -876,7 +867,7 @@ fn render_sidebar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
     ])
     .areas(inner);
 
-    // 1. Collections (6 statuses)
+    const MARKER_HOTKEY_SPACE_WIDTH: usize = 3;
     let mut list_items = Vec::with_capacity(LibraryStatus::ALL.len());
     let mut visual_selected = None;
 
@@ -892,8 +883,8 @@ fn render_sidebar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
         let marker = if is_active { "▌" } else { " " };
         let label = status.label();
 
-        let prefix_len = 3 + label.len(); // marker(1) + hotkey(1) + space(1) + label
-        let pad = width.saturating_sub(prefix_len + count_str.len());
+        let prefix_width = MARKER_HOTKEY_SPACE_WIDTH + label.len();
+        let pad = width.saturating_sub(prefix_width + count_str.len());
 
         let item = if is_cursor {
             let row_text = format!("{marker}{hotkey} {label}{}{count_str}", " ".repeat(pad));
@@ -940,12 +931,10 @@ fn render_sidebar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
     let mut list_state = ListState::default().with_selected(visual_selected);
     frame.render_stateful_widget(List::new(list_items), lists_area, &mut list_state);
 
-    // 2. Calm Overview block in the middle space (zero clutter, aligned key-value pairs)
     if show_overview && middle_area.height >= 6 {
         render_sidebar_overview(frame, middle_area, view.overview, palette);
     }
 
-    // 3. Bottom-pinned Sign Out
     if logout_area.height > 0 {
         let logout_idx = SidebarItem::ALL.len().saturating_sub(1);
         let is_logout_cursor = is_focused && view.sidebar_index == logout_idx;
@@ -965,7 +954,7 @@ fn render_sidebar(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_>) {
                 Style::default().fg(palette.border),
             ));
         }
-        let logout_label = "  Sign Out";
+        let logout_label = format!("  {}", SidebarItem::LogOut.label());
         let pad = width.saturating_sub(logout_label.len());
         footer_lines.push(Line::styled(
             format!("{logout_label}{}", " ".repeat(pad)),
@@ -986,7 +975,7 @@ fn render_sidebar_overview(
         return;
     }
 
-    let kv_line = |label: &'static str, value: String| -> Line<'static> {
+    let stat_row = |label: &'static str, value: String| -> Line<'static> {
         let pad = width.saturating_sub(2 + label.len() + value.len());
         Line::from(vec![
             Span::raw("  "),
@@ -1008,10 +997,10 @@ fn render_sidebar_overview(
                 .fg(palette.muted)
                 .add_modifier(Modifier::BOLD),
         ),
-        kv_line("Titles", overview.total_titles.to_string()),
-        kv_line("Episodes", overview.episodes_watched.to_string()),
-        kv_line("Rated", overview.rated_count.to_string()),
-        kv_line("Mean Score", mean_text),
+        stat_row("Titles", overview.total_titles.to_string()),
+        stat_row("Episodes", overview.episodes_watched.to_string()),
+        stat_row("Rated", overview.rated_count.to_string()),
+        stat_row("Mean Score", mean_text),
     ];
 
     frame.render_widget(Paragraph::new(lines), area);
@@ -1058,7 +1047,7 @@ fn render_compact_strip(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_
                 SidebarItem::Status(s) => {
                     format!("{}({})", item.label(), view.counts[s.index()]).len()
                 }
-                SidebarItem::LogOut => "Sign Out".len(),
+                SidebarItem::LogOut => item.label().len(),
             };
             label_len + usize::from(i > 0)
         })
@@ -1095,7 +1084,7 @@ fn render_compact_strip(frame: &mut Frame<'_>, area: Rect, view: &LibraryView<'_
                 spans.push(Span::styled(text, style));
             }
             SidebarItem::LogOut => {
-                let text = if use_full { "Sign Out" } else { "Out" };
+                let text = if use_full { item.label() } else { "Out" };
                 let style = if is_cursor {
                     Style::default()
                         .bg(palette.error)
@@ -2399,7 +2388,7 @@ mod tests {
     fn auth_screen_handles_transparent_background_and_submitting_state() {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
-        let palette = ThemePalette::from_name("textual-ansi");
+        let palette = ThemePalette::from_name("terminal");
         assert_eq!(palette.background, Color::Reset);
 
         let view = AuthView {
@@ -2521,7 +2510,6 @@ mod tests {
         assert!(rendered.contains("After the party of heroes"));
         assert!(cover_rect.is_some());
 
-        // Verify Spotlight is above Watching table, and Collections is to the RIGHT of Spotlight.
         let spotlight_pos = rendered.find("Spotlight").expect("Spotlight title present");
         let collections_pos = rendered
             .find("Collections")
@@ -2606,7 +2594,7 @@ mod tests {
         assert!(rendered.contains("Watching(1)"));
         assert!(rendered.contains("Frieren"));
         assert!(rendered.contains("Ep 12 / 28"));
-        // Cover is hidden on <76 cols narrow layout so info area stays readable.
+        // Cover is hidden below 62 cols so the info area stays readable.
         assert!(cover_rect.is_none());
     }
 

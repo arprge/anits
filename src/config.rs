@@ -14,7 +14,6 @@ use thiserror::Error;
 
 use crate::domain::{ScoreFormat, SortDirection, SortField};
 
-/// Default theme name (AniList dark palette).
 pub const DEFAULT_THEME: &str = "anilist";
 
 /// Curated basic themes cycled in the `?` Help & Settings overlay.
@@ -28,7 +27,6 @@ pub const CURATED_THEMES: &[(&str, &str)] = &[
     ("dracula", "Dracula"),
 ];
 
-/// Errors returned when reading or writing config and auth files.
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("could not determine user home or config directory")]
@@ -55,18 +53,15 @@ pub enum ConfigError {
     MissingClientId,
 }
 
-/// User preference for which AniList rating format to display and input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScoreFormatPreference {
     /// Follow the user's AniList `mediaListOptions.scoreFormat` setting, defaulting to `9.8/10`.
     #[default]
     Auto,
-    /// Override the rating format explicitly regardless of account setting.
     Override(ScoreFormat),
 }
 
 impl ScoreFormatPreference {
-    /// Returns the TOML string written to `[ui].score_format`.
     #[must_use]
     pub const fn config_value(self) -> &'static str {
         match self {
@@ -75,7 +70,6 @@ impl ScoreFormatPreference {
         }
     }
 
-    /// Parses a `[ui].score_format` string; unrecognized values return `None`.
     #[must_use]
     pub fn from_config_value(raw: &str) -> Option<Self> {
         let trimmed = raw.trim();
@@ -85,7 +79,6 @@ impl ScoreFormatPreference {
         ScoreFormat::from_config_key(trimmed).map(Self::Override)
     }
 
-    /// Resolves the active [`ScoreFormat`], defaulting to [`ScoreFormat::Point10Decimal`].
     #[must_use]
     pub fn resolve(self, api_format: Option<ScoreFormat>) -> ScoreFormat {
         match self {
@@ -95,7 +88,6 @@ impl ScoreFormatPreference {
     }
 }
 
-/// User UI configuration loaded from `~/.config/anits/config.toml`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
     pub theme: String,
@@ -134,7 +126,6 @@ struct RawUiConfig {
     sort_order: Option<String>,
 }
 
-/// Persisted AniList authentication state from `~/.config/anits/auth.json`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthSession {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,7 +137,6 @@ pub struct AuthSession {
 }
 
 impl AuthSession {
-    /// Returns `true` when both an access token and username are present.
     #[must_use]
     pub fn is_authenticated(&self) -> bool {
         self.access_token
@@ -174,7 +164,6 @@ impl AuthSession {
             .map(str::to_owned)
     }
 
-    /// Clears `access_token` and `username` while preserving `client_id`.
     pub fn clear_credentials(&mut self) {
         self.access_token = None;
         self.username = None;
@@ -205,7 +194,6 @@ pub fn oauth_url(client_id: &str) -> Result<String, ConfigError> {
     ))
 }
 
-/// Returns the default configuration directory (`~/.config/anits`).
 pub fn config_dir() -> Result<PathBuf, ConfigError> {
     if let Some(home) = dirs::home_dir() {
         return Ok(home.join(".config").join("anits"));
@@ -215,7 +203,6 @@ pub fn config_dir() -> Result<PathBuf, ConfigError> {
         .ok_or(ConfigError::MissingHomeDir)
 }
 
-/// Returns the default cache directory (`~/.cache/anits`).
 pub fn cache_dir() -> Result<PathBuf, ConfigError> {
     if let Some(home) = dirs::home_dir() {
         return Ok(home.join(".cache").join("anits"));
@@ -225,7 +212,6 @@ pub fn cache_dir() -> Result<PathBuf, ConfigError> {
         .ok_or(ConfigError::MissingHomeDir)
 }
 
-/// Loads `~/.config/anits/config.toml`, creating a default file if missing.
 pub fn load_app_config() -> AppConfig {
     let Ok(dir) = config_dir() else {
         return AppConfig::default();
@@ -233,7 +219,6 @@ pub fn load_app_config() -> AppConfig {
     load_app_config_from(&dir.join("config.toml"))
 }
 
-/// Loads an [`AppConfig`] from `path`, creating it with defaults if it does not exist.
 pub fn load_app_config_from(path: &Path) -> AppConfig {
     if !path.exists() {
         if let Some(parent) = path.parent() {
@@ -288,13 +273,11 @@ pub fn load_app_config_from(path: &Path) -> AppConfig {
     }
 }
 
-/// Persists [`AppConfig`] to `~/.config/anits/config.toml`.
 pub fn save_app_config(cfg: &AppConfig) -> Result<(), ConfigError> {
     let dir = config_dir()?;
     save_app_config_to(&dir.join("config.toml"), cfg)
 }
 
-/// Persists [`AppConfig`] atomically to `path`.
 pub fn save_app_config_to(path: &Path, cfg: &AppConfig) -> Result<(), ConfigError> {
     let raw = RawConfigFile {
         ui: Some(RawUiConfig {
@@ -312,13 +295,11 @@ pub fn save_app_config_to(path: &Path, cfg: &AppConfig) -> Result<(), ConfigErro
     atomic_write_file(path, toml_text.as_bytes(), false)
 }
 
-/// Loads [`AuthSession`] from `~/.config/anits/auth.json`.
 pub fn load_auth_session() -> Result<AuthSession, ConfigError> {
     let dir = config_dir()?;
     Ok(load_auth_session_from(&dir.join("auth.json")))
 }
 
-/// Loads [`AuthSession`] from `path`, returning [`AuthSession::default()`] if missing or invalid.
 #[must_use]
 pub fn load_auth_session_from(path: &Path) -> AuthSession {
     let Ok(contents) = fs::read_to_string(path) else {
@@ -327,14 +308,12 @@ pub fn load_auth_session_from(path: &Path) -> AuthSession {
     serde_json::from_str(&contents).unwrap_or_default()
 }
 
-/// Persists [`AuthSession`] to `~/.config/anits/auth.json`.
 pub fn save_auth_session(session: &AuthSession) -> Result<(), ConfigError> {
     let dir = config_dir()?;
     save_auth_session_to(&dir.join("auth.json"), session)
 }
 
-/// Persists [`AuthSession`] atomically to `path` with `0o600` permissions on Unix,
-/// removing the file if all fields are `None`.
+/// Writes `session` atomically with `0o600` permissions on Unix, or removes `path` if all fields are `None`.
 pub fn save_auth_session_to(path: &Path, session: &AuthSession) -> Result<(), ConfigError> {
     if session.access_token.is_none()
         && session.client_id.is_none()
@@ -357,7 +336,7 @@ pub fn save_auth_session_to(path: &Path, session: &AuthSession) -> Result<(), Co
     atomic_write_file(path, json.as_bytes(), true)
 }
 
-fn atomic_write_file(path: &Path, bytes: &[u8], private: bool) -> Result<(), ConfigError> {
+fn atomic_write_file(path: &Path, bytes: &[u8], owner_only: bool) -> Result<(), ConfigError> {
     let parent = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -380,7 +359,7 @@ fn atomic_write_file(path: &Path, bytes: &[u8], private: bool) -> Result<(), Con
         std::process::id()
     ));
 
-    let write_res = write_new_file(&tmp_path, bytes, private);
+    let write_res = write_new_file(&tmp_path, bytes, owner_only);
     if let Err(source) = write_res {
         let _ = fs::remove_file(&tmp_path);
         return Err(ConfigError::Io {
@@ -400,11 +379,11 @@ fn atomic_write_file(path: &Path, bytes: &[u8], private: bool) -> Result<(), Con
     Ok(())
 }
 
-fn write_new_file(path: &Path, bytes: &[u8], private: bool) -> std::io::Result<()> {
+fn write_new_file(path: &Path, bytes: &[u8], owner_only: bool) -> std::io::Result<()> {
     let mut opts = OpenOptions::new();
     opts.write(true).create_new(true);
     #[cfg(unix)]
-    if private {
+    if owner_only {
         use std::os::unix::fs::OpenOptionsExt;
         opts.mode(0o600);
     }
@@ -413,7 +392,7 @@ fn write_new_file(path: &Path, bytes: &[u8], private: bool) -> std::io::Result<(
     file.sync_all()?;
 
     #[cfg(unix)]
-    if private {
+    if owner_only {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
     }
@@ -421,9 +400,9 @@ fn write_new_file(path: &Path, bytes: &[u8], private: bool) -> std::io::Result<(
     Ok(())
 }
 
-/// Parses `#RRGGBB` hex colors or `"transparent"` / `"none"` into a `ratatui` [`Color`].
+/// Parses `#RRGGBB`, `"transparent"`, or `"none"` into a `ratatui` [`Color`].
 #[must_use]
-pub fn parse_hex_color(raw: &str) -> Option<Color> {
+pub fn parse_color(raw: &str) -> Option<Color> {
     let trimmed = raw.trim();
     if trimmed.eq_ignore_ascii_case("transparent") || trimmed.eq_ignore_ascii_case("none") {
         return Some(Color::Reset);
@@ -438,7 +417,6 @@ pub fn parse_hex_color(raw: &str) -> Option<Color> {
     Some(Color::Rgb(r, g, b))
 }
 
-/// Color palette resolved from a configured theme name and optional background override.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ThemePalette {
     pub background: Color,
@@ -454,17 +432,15 @@ pub struct ThemePalette {
 }
 
 impl ThemePalette {
-    /// Resolves a palette from [`AppConfig`], applying any valid `background` override.
     #[must_use]
     pub fn from_config(cfg: &AppConfig) -> Self {
         let mut palette = Self::from_name(&cfg.theme);
-        if let Some(bg) = cfg.background.as_deref().and_then(parse_hex_color) {
+        if let Some(bg) = cfg.background.as_deref().and_then(parse_color) {
             palette.background = bg;
         }
         palette
     }
 
-    /// Returns the next curated theme key in [`CURATED_THEMES`], wrapping around.
     #[must_use]
     pub fn next_theme_name(current: &str) -> &'static str {
         let lower = current.trim().to_ascii_lowercase();
@@ -475,7 +451,6 @@ impl ThemePalette {
         }
     }
 
-    /// Returns a human-readable display label for a theme key.
     #[must_use]
     pub fn display_name(name: &str) -> &str {
         let lower = name.trim().to_ascii_lowercase();
@@ -505,7 +480,6 @@ impl ThemePalette {
     pub fn from_name(name: &str) -> Self {
         match name.trim().to_ascii_lowercase().as_str() {
             "catppuccin-mocha" => Self {
-                // Catppuccin Mocha: base, surface0, subtext0, surface2; softened mauve/blue accents.
                 background: Color::Rgb(30, 30, 46),
                 surface: Color::Rgb(49, 50, 68),
                 text: Color::Rgb(215, 220, 234),
@@ -517,47 +491,7 @@ impl ThemePalette {
                 error: Color::Rgb(220, 162, 178),
                 border: Color::Rgb(88, 91, 112),
             },
-            "catppuccin-latte" => Self {
-                // Catppuccin Latte: base, surface0, subtext0, surface2; softened mauve/blue accents.
-                background: Color::Rgb(239, 241, 245),
-                surface: Color::Rgb(204, 208, 218),
-                text: Color::Rgb(76, 79, 105),
-                muted: Color::Rgb(108, 111, 133),
-                accent: Color::Rgb(142, 100, 196),
-                secondary: Color::Rgb(90, 122, 184),
-                success: Color::Rgb(56, 111, 45),
-                warning: Color::Rgb(112, 86, 42),
-                error: Color::Rgb(163, 62, 84),
-                border: Color::Rgb(172, 176, 190),
-            },
-            "catppuccin-frappe" => Self {
-                // Catppuccin Frappe: base, surface0, subtext0, surface2; softened mauve/blue accents.
-                background: Color::Rgb(48, 52, 70),
-                surface: Color::Rgb(65, 69, 89),
-                text: Color::Rgb(211, 216, 232),
-                muted: Color::Rgb(170, 176, 201),
-                accent: Color::Rgb(200, 167, 221),
-                secondary: Color::Rgb(163, 179, 215),
-                success: Color::Rgb(166, 207, 139),
-                warning: Color::Rgb(217, 196, 156),
-                error: Color::Rgb(214, 147, 148),
-                border: Color::Rgb(98, 104, 128),
-            },
-            "catppuccin-macchiato" => Self {
-                // Catppuccin Macchiato: base, surface0, subtext0, surface2; softened mauve/blue accents.
-                background: Color::Rgb(36, 39, 58),
-                surface: Color::Rgb(54, 58, 79),
-                text: Color::Rgb(214, 218, 233),
-                muted: Color::Rgb(168, 175, 200),
-                accent: Color::Rgb(200, 180, 226),
-                secondary: Color::Rgb(165, 182, 217),
-                success: Color::Rgb(168, 214, 153),
-                warning: Color::Rgb(224, 207, 173),
-                error: Color::Rgb(217, 155, 164),
-                border: Color::Rgb(91, 96, 120),
-            },
             "gruvbox" => Self {
-                // Gruvbox dark: bg0, bg1, fg1, fg4, bg3; muted terracotta/amber accent, sage secondary.
                 background: Color::Rgb(40, 40, 40),
                 surface: Color::Rgb(60, 56, 54),
                 text: Color::Rgb(221, 213, 192),
@@ -570,7 +504,6 @@ impl ThemePalette {
                 border: Color::Rgb(102, 92, 84),
             },
             "nord" => Self {
-                // Nord: nord0, nord1, nord4, nord6, nord3; nord8 accent, nord9 secondary.
                 background: Color::Rgb(46, 52, 64),
                 surface: Color::Rgb(59, 66, 82),
                 text: Color::Rgb(236, 239, 244),
@@ -583,7 +516,6 @@ impl ThemePalette {
                 border: Color::Rgb(76, 86, 106),
             },
             "tokyo-night" => Self {
-                // Tokyo Night: night background, storm panel, muted slate-blue accent, lavender secondary.
                 background: Color::Rgb(26, 27, 38),
                 surface: Color::Rgb(36, 40, 59),
                 text: Color::Rgb(208, 212, 229),
@@ -596,7 +528,6 @@ impl ThemePalette {
                 border: Color::Rgb(66, 73, 103),
             },
             "dracula" => Self {
-                // Dracula: background, current line, softened plum accent, muted cyan secondary.
                 background: Color::Rgb(40, 42, 54),
                 surface: Color::Rgb(68, 71, 90),
                 text: Color::Rgb(248, 248, 242),
@@ -608,150 +539,7 @@ impl ThemePalette {
                 error: Color::Rgb(208, 132, 132),
                 border: Color::Rgb(104, 117, 158),
             },
-            "monokai" => Self {
-                // Monokai: background, panel, selection border; softened purple accent, cyan secondary.
-                background: Color::Rgb(39, 40, 34),
-                surface: Color::Rgb(62, 61, 50),
-                text: Color::Rgb(248, 248, 242),
-                muted: Color::Rgb(168, 164, 148),
-                accent: Color::Rgb(184, 164, 220),
-                secondary: Color::Rgb(137, 193, 204),
-                success: Color::Rgb(153, 186, 86),
-                warning: Color::Rgb(210, 203, 136),
-                error: Color::Rgb(194, 93, 129),
-                border: Color::Rgb(73, 72, 62),
-            },
-            "flexoki" => Self {
-                // Flexoki: black, base-950, base-500, base-700; muted blue accent, purple secondary.
-                background: Color::Rgb(16, 15, 15),
-                surface: Color::Rgb(28, 27, 26),
-                text: Color::Rgb(206, 205, 195),
-                muted: Color::Rgb(135, 133, 128),
-                accent: Color::Rgb(72, 133, 185),
-                secondary: Color::Rgb(139, 126, 200),
-                success: Color::Rgb(132, 150, 61),
-                warning: Color::Rgb(187, 119, 75),
-                error: Color::Rgb(190, 93, 84),
-                border: Color::Rgb(87, 86, 83),
-            },
-            "rose-pine" => Self {
-                // Rose Pine: base, surface, subtle, highlight med; dusty iris accent, foam secondary.
-                background: Color::Rgb(25, 23, 36),
-                surface: Color::Rgb(31, 29, 46),
-                text: Color::Rgb(228, 226, 240),
-                muted: Color::Rgb(144, 140, 170),
-                accent: Color::Rgb(197, 174, 224),
-                secondary: Color::Rgb(158, 205, 214),
-                success: Color::Rgb(69, 140, 169),
-                warning: Color::Rgb(215, 188, 150),
-                error: Color::Rgb(210, 136, 157),
-                border: Color::Rgb(64, 61, 82),
-            },
-            "rose-pine-moon" => Self {
-                // Rose Pine Moon: base, surface, subtle, highlight med; dusty iris/foam accents.
-                background: Color::Rgb(35, 33, 54),
-                surface: Color::Rgb(42, 39, 63),
-                text: Color::Rgb(228, 226, 240),
-                muted: Color::Rgb(144, 140, 170),
-                accent: Color::Rgb(197, 174, 224),
-                secondary: Color::Rgb(158, 205, 214),
-                success: Color::Rgb(69, 140, 169),
-                warning: Color::Rgb(215, 188, 150),
-                error: Color::Rgb(210, 136, 157),
-                border: Color::Rgb(68, 65, 90),
-            },
-            "rose-pine-dawn" => Self {
-                // Rose Pine Dawn: base, overlay, muted, highlight high; dusty iris/foam accents.
-                background: Color::Rgb(248, 244, 239),
-                surface: Color::Rgb(240, 233, 227),
-                text: Color::Rgb(87, 82, 121),
-                muted: Color::Rgb(110, 106, 134),
-                accent: Color::Rgb(144, 122, 169),
-                secondary: Color::Rgb(74, 131, 140),
-                success: Color::Rgb(50, 101, 121),
-                warning: Color::Rgb(123, 97, 46),
-                error: Color::Rgb(163, 74, 99),
-                border: Color::Rgb(206, 202, 205),
-            },
-            "solarized-light" => Self {
-                // Solarized Light: softened warm paper base, muted blue accent, teal secondary.
-                background: Color::Rgb(246, 243, 234),
-                surface: Color::Rgb(234, 230, 217),
-                text: Color::Rgb(88, 110, 117),
-                muted: Color::Rgb(99, 120, 128),
-                accent: Color::Rgb(68, 134, 180),
-                secondary: Color::Rgb(46, 107, 102),
-                success: Color::Rgb(81, 89, 36),
-                warning: Color::Rgb(100, 84, 38),
-                error: Color::Rgb(188, 81, 79),
-                border: Color::Rgb(147, 161, 161),
-            },
-            "solarized-dark" => Self {
-                // Solarized Dark: softened deep teal-slate base, muted blue accent, teal secondary.
-                background: Color::Rgb(18, 32, 36),
-                surface: Color::Rgb(26, 43, 47),
-                text: Color::Rgb(147, 161, 161),
-                muted: Color::Rgb(131, 148, 150),
-                accent: Color::Rgb(68, 134, 180),
-                secondary: Color::Rgb(61, 142, 136),
-                success: Color::Rgb(107, 116, 47),
-                warning: Color::Rgb(131, 111, 50),
-                error: Color::Rgb(188, 81, 79),
-                border: Color::Rgb(88, 110, 117),
-            },
-            "atom-one-dark" => Self {
-                // Atom One Dark: bg, bg-dark panel, fg, border; muted plum accent, slate blue secondary.
-                background: Color::Rgb(40, 44, 52),
-                surface: Color::Rgb(33, 37, 43),
-                text: Color::Rgb(171, 178, 191),
-                muted: Color::Rgb(133, 140, 153),
-                accent: Color::Rgb(191, 132, 209),
-                secondary: Color::Rgb(133, 171, 203),
-                success: Color::Rgb(152, 195, 121),
-                warning: Color::Rgb(212, 187, 140),
-                error: Color::Rgb(206, 126, 132),
-                border: Color::Rgb(75, 82, 99),
-            },
-            "atom-one-light" => Self {
-                // Atom One Light: bg, surface, fg, border; muted plum accent, slate blue secondary.
-                background: Color::Rgb(250, 250, 250),
-                surface: Color::Rgb(240, 240, 241),
-                text: Color::Rgb(56, 58, 66),
-                muted: Color::Rgb(105, 108, 119),
-                accent: Color::Rgb(148, 56, 146),
-                secondary: Color::Rgb(112, 138, 194),
-                success: Color::Rgb(77, 154, 76),
-                warning: Color::Rgb(141, 113, 53),
-                error: Color::Rgb(198, 111, 103),
-                border: Color::Rgb(208, 208, 211),
-            },
-            "textual-dark" => Self {
-                // Textual dark palette with softened slate-blue accents.
-                background: Color::Rgb(18, 18, 18),
-                surface: Color::Rgb(30, 30, 30),
-                text: Color::Rgb(224, 224, 224),
-                muted: Color::Rgb(140, 140, 140),
-                accent: Color::Rgb(59, 113, 154),
-                secondary: Color::Rgb(77, 145, 178),
-                success: Color::Rgb(84, 185, 115),
-                warning: Color::Rgb(197, 157, 101),
-                error: Color::Rgb(178, 68, 95),
-                border: Color::Rgb(68, 68, 68),
-            },
-            "textual-light" => Self {
-                // Textual light palette with softened slate-blue accents.
-                background: Color::Rgb(248, 249, 250),
-                surface: Color::Rgb(233, 236, 239),
-                text: Color::Rgb(33, 37, 41),
-                muted: Color::Rgb(92, 99, 106),
-                accent: Color::Rgb(33, 64, 87),
-                secondary: Color::Rgb(64, 112, 149),
-                success: Color::Rgb(50, 121, 80),
-                warning: Color::Rgb(112, 89, 42),
-                error: Color::Rgb(158, 60, 84),
-                border: Color::Rgb(173, 181, 189),
-            },
-            "terminal" | "transparent" | "ansi" | "textual-ansi" => Self {
+            "terminal" | "transparent" | "ansi" => Self {
                 // Transparent theme: keep the terminal's own background and
                 // default foreground. Accents use the regular ANSI palette
                 // (like OpenCode's system theme) instead of the bright
@@ -772,7 +560,7 @@ impl ThemePalette {
                 error: Color::Red,
                 border: Color::Indexed(242),
             },
-            // Default: AniList dark palette (softened slate-navy and calm sky blue)
+            // Default: anilist
             _ => Self {
                 background: Color::Rgb(15, 22, 30),
                 surface: Color::Rgb(24, 32, 43),
@@ -798,7 +586,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system clock after unix epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("anilist_tui_test_{label}_{nanos}"))
+        std::env::temp_dir().join(format!("anits_test_{label}_{nanos}"))
     }
 
     #[test]
@@ -850,12 +638,12 @@ mod tests {
 
     #[test]
     fn parses_hex_and_transparent_colors_for_palette_override() {
-        assert_eq!(parse_hex_color("#11111b"), Some(Color::Rgb(17, 17, 27)));
-        assert_eq!(parse_hex_color(" #FF00aa "), Some(Color::Rgb(255, 0, 170)));
-        assert_eq!(parse_hex_color("TRANSPARENT"), Some(Color::Reset));
-        assert_eq!(parse_hex_color("none"), Some(Color::Reset));
-        assert_eq!(parse_hex_color("not-a-color"), None);
-        assert_eq!(parse_hex_color("#12345"), None);
+        assert_eq!(parse_color("#11111b"), Some(Color::Rgb(17, 17, 27)));
+        assert_eq!(parse_color(" #FF00aa "), Some(Color::Rgb(255, 0, 170)));
+        assert_eq!(parse_color("TRANSPARENT"), Some(Color::Reset));
+        assert_eq!(parse_color("none"), Some(Color::Reset));
+        assert_eq!(parse_color("not-a-color"), None);
+        assert_eq!(parse_color("#12345"), None);
 
         let cfg = AppConfig {
             theme: "nord".to_owned(),
@@ -1057,24 +845,10 @@ mod tests {
         const THEMES: &[&str] = &[
             "anilist",
             "catppuccin-mocha",
-            "catppuccin-latte",
-            "catppuccin-frappe",
-            "catppuccin-macchiato",
-            "gruvbox",
-            "nord",
             "tokyo-night",
+            "nord",
+            "gruvbox",
             "dracula",
-            "monokai",
-            "flexoki",
-            "rose-pine",
-            "rose-pine-moon",
-            "rose-pine-dawn",
-            "solarized-light",
-            "solarized-dark",
-            "atom-one-dark",
-            "atom-one-light",
-            "textual-dark",
-            "textual-light",
         ];
         let fallback = ThemePalette::from_name("__unknown__");
 

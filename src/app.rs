@@ -37,7 +37,6 @@ const TOAST_LONG: Duration = Duration::from_secs(5);
 const PREFETCH_RADIUS: usize = 5;
 const DEFAULT_COVER_AREA: Rect = Rect::new(0, 0, 28, 16);
 
-/// Focused pane on the main library screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusPane {
     Sidebar,
@@ -46,7 +45,6 @@ pub enum FocusPane {
 }
 
 impl FocusPane {
-    /// Advances focus clockwise (`Sidebar -> Table -> Details -> Sidebar`).
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
@@ -56,7 +54,6 @@ impl FocusPane {
         }
     }
 
-    /// Moves focus counter-clockwise (`Sidebar -> Details -> Table -> Sidebar`).
     #[must_use]
     pub const fn prev(self) -> Self {
         match self {
@@ -67,7 +64,6 @@ impl FocusPane {
     }
 }
 
-/// Items displayed in the left navigation sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarItem {
     Status(LibraryStatus),
@@ -75,7 +71,6 @@ pub enum SidebarItem {
 }
 
 impl SidebarItem {
-    /// Canonical display order for all sidebar entries.
     pub const ALL: [Self; 7] = [
         Self::Status(LibraryStatus::Watching),
         Self::Status(LibraryStatus::Planning),
@@ -86,17 +81,15 @@ impl SidebarItem {
         Self::LogOut,
     ];
 
-    /// Human-readable label shown in the sidebar.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Status(status) => status.label(),
-            Self::LogOut => "Log Out",
+            Self::LogOut => "Sign Out",
         }
     }
 }
 
-/// Scope for local instant `/` filtering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterScope {
     CurrentList,
@@ -104,7 +97,6 @@ pub enum FilterScope {
 }
 
 impl FilterScope {
-    /// Toggles between `CurrentList` and `AllLists`.
     #[must_use]
     pub const fn toggle(self) -> Self {
         match self {
@@ -114,7 +106,6 @@ impl FilterScope {
     }
 }
 
-/// Active modal overlay rendered over the library screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveModal {
     None,
@@ -124,7 +115,6 @@ pub enum ActiveModal {
     Help,
 }
 
-/// Interactive controls on the authentication screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthField {
     ClientId,
@@ -134,7 +124,6 @@ pub enum AuthField {
 }
 
 impl AuthField {
-    /// Cycles forward through the authentication form fields.
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
@@ -145,7 +134,6 @@ impl AuthField {
         }
     }
 
-    /// Cycles backward through the authentication form fields.
     #[must_use]
     pub const fn prev(self) -> Self {
         match self {
@@ -157,7 +145,6 @@ impl AuthField {
     }
 }
 
-/// State for the OAuth setup and token entry screen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthScreenState {
     pub client_id: String,
@@ -168,21 +155,18 @@ pub struct AuthScreenState {
 }
 
 impl AuthScreenState {
-    /// Builds the AniList implicit-grant authorization URL when `client_id` is non-empty.
     #[must_use]
     pub fn oauth_url_preview(&self) -> Option<String> {
         oauth_url(&self.client_id).ok()
     }
 }
 
-/// Active application screen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     Auth(AuthScreenState),
     Library,
 }
 
-/// Severity level for transient toast notifications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastLevel {
     Info,
@@ -191,7 +175,6 @@ pub enum ToastLevel {
     Error,
 }
 
-/// Ephemeral toast notification displayed in the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Toast {
     pub message: String,
@@ -226,7 +209,6 @@ pub enum PendingRollback {
 }
 
 impl PendingRollback {
-    /// Returns the monotonic sequence number associated with this optimistic mutation.
     #[must_use]
     pub const fn seq(&self) -> u64 {
         match self {
@@ -238,7 +220,6 @@ impl PendingRollback {
     }
 }
 
-/// Side-effect commands emitted by [`AppState`] for execution by [`run_app`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppCommand {
     Authenticate {
@@ -275,7 +256,6 @@ pub enum AppCommand {
     Quit,
 }
 
-/// Asynchronous and timer events delivered into [`AppState::apply_event`].
 pub enum AppEvent {
     AuthSucceeded {
         client_id: String,
@@ -332,7 +312,6 @@ pub enum AppEvent {
     Tick,
 }
 
-/// Complete UI and domain state for `anits`.
 pub struct AppState {
     pub screen: Screen,
     pub palette: ThemePalette,
@@ -368,24 +347,21 @@ pub struct AppState {
     next_mutation_seq: u64,
     active_mutations: HashMap<MediaId, u64>,
     progress_rollback_base: HashMap<MediaId, u32>,
-    rating_pristine: bool,
+    clear_rating_input_on_edit: bool,
 }
 
 impl AppState {
-    /// Creates a new [`AppState`] initialized from theme palette and persisted auth session.
     #[must_use]
     pub fn new(palette: ThemePalette, auth: AuthSession) -> Self {
         Self::new_with_config(palette, AppConfig::default(), auth)
     }
 
-    /// Creates a new [`AppState`] initialized from [`AppConfig`] and persisted auth session.
     #[must_use]
     pub fn from_config(app_config: AppConfig, auth: AuthSession) -> Self {
         let palette = ThemePalette::from_config(&app_config);
         Self::new_with_config(palette, app_config, auth)
     }
 
-    /// Creates a new [`AppState`] with explicit palette, app config, and auth session.
     #[must_use]
     pub fn new_with_config(palette: ThemePalette, app_config: AppConfig, auth: AuthSession) -> Self {
         let screen = if auth.is_authenticated() {
@@ -444,29 +420,26 @@ impl AppState {
             next_mutation_seq: 0,
             active_mutations: HashMap::new(),
             progress_rollback_base: HashMap::new(),
-            rating_pristine: false,
+            clear_rating_input_on_edit: false,
         }
     }
 
-    /// Returns the active rating format resolved from config override, AniList setting, or `9.8/10`.
     #[must_use]
     pub fn effective_score_format(&self) -> ScoreFormat {
         self.score_format_pref.resolve(self.api_score_format)
     }
 
-    /// Returns the currently configured theme key.
     #[must_use]
     pub fn theme_name(&self) -> &str {
         &self.app_config.theme
     }
 
-    /// Returns the monotonic session epoch used to fence stale async responses.
+    /// Monotonic epoch used to fence stale async responses across logout/re-auth.
     #[must_use]
     pub const fn session_epoch(&self) -> u64 {
         self.session_epoch
     }
 
-    /// Returns borrowed references to all currently visible rows with zero string allocation.
     #[must_use]
     pub fn visible_items(&self) -> Vec<&AnimeItem> {
         let mut items = Vec::with_capacity(self.visible_rows.len());
@@ -478,27 +451,23 @@ impl AppState {
         items
     }
 
-    /// Returns the number of rows currently visible in the anime table.
     #[must_use]
     pub fn visible_len(&self) -> usize {
         self.visible_rows.len()
     }
 
-    /// Returns a borrowed reference to the currently selected anime, if any.
     #[must_use]
     pub fn selected_item(&self) -> Option<&AnimeItem> {
         let &(status, idx) = self.visible_rows.get(self.table_selected)?;
         self.library.items_for(status).get(idx)
     }
 
-    /// Returns the currently active (non-expired) toast notification.
     #[must_use]
     pub fn active_toast(&self) -> Option<&Toast> {
         let now = Instant::now();
         self.toast.as_ref().filter(|t| now < t.expires_at)
     }
 
-    /// Returns the number of selectable options in the active modal.
     #[must_use]
     pub fn active_modal_options_count(&self) -> usize {
         match self.modal {
@@ -513,7 +482,6 @@ impl AppState {
         }
     }
 
-    /// Recomputes cached `(LibraryStatus, usize)` row indices and clamps `table_selected`.
     pub fn rebuild_visible_rows(&mut self) {
         self.visible_rows.clear();
         let trimmed = self.filter_query.trim();
@@ -549,10 +517,16 @@ impl AppState {
             field => {
                 let direction = self.sort_direction;
                 let library = &self.library;
-                self.visible_rows.sort_by(|&(sa, ia), &(sb, ib)| {
-                    match (library.items_for(sa).get(ia), library.items_for(sb).get(ib)) {
+                self.visible_rows.sort_by(|&(status_a, idx_a), &(status_b, idx_b)| {
+                    match (
+                        library.items_for(status_a).get(idx_a),
+                        library.items_for(status_b).get(idx_b),
+                    ) {
                         (Some(a), Some(b)) => field.compare_items(a, b, direction),
-                        _ => sa.index().cmp(&sb.index()).then_with(|| ia.cmp(&ib)),
+                        _ => status_a
+                            .index()
+                            .cmp(&status_b.index())
+                            .then_with(|| idx_a.cmp(&idx_b)),
                     }
                 });
             }
@@ -569,7 +543,6 @@ impl AppState {
         }
     }
 
-    /// Handles a terminal key press and returns side-effect commands to execute.
     pub fn handle_key(&mut self, key: KeyEvent) -> Vec<AppCommand> {
         if key.kind != KeyEventKind::Press {
             return Vec::new();
@@ -585,7 +558,6 @@ impl AppState {
         }
     }
 
-    /// Applies an asynchronous or timer event and returns any follow-up commands.
     pub fn apply_event(&mut self, event: AppEvent) -> Vec<AppCommand> {
         match event {
             AppEvent::AuthSucceeded {
@@ -1090,7 +1062,7 @@ impl AppState {
                         | ScoreFormat::Point100 => {
                             self.rating_input = format.format_input_initial(item.entry.score);
                             self.rating_input_error = None;
-                            self.rating_pristine = true;
+                            self.clear_rating_input_on_edit = true;
                             self.modal = ActiveModal::RatingPicker { selected: 0 };
                         }
                     }
@@ -1550,9 +1522,9 @@ impl AppState {
                 Vec::new()
             }
             KeyCode::Backspace => {
-                if self.rating_pristine {
+                if self.clear_rating_input_on_edit {
                     self.rating_input.clear();
-                    self.rating_pristine = false;
+                    self.clear_rating_input_on_edit = false;
                 } else {
                     self.rating_input.pop();
                 }
@@ -1563,11 +1535,11 @@ impl AppState {
                 if ch.is_ascii_digit()
                     || (ch == '.'
                         && format == ScoreFormat::Point10Decimal
-                        && (self.rating_pristine || !self.rating_input.contains('.'))) =>
+                        && (self.clear_rating_input_on_edit || !self.rating_input.contains('.'))) =>
             {
-                if self.rating_pristine {
+                if self.clear_rating_input_on_edit {
                     self.rating_input.clear();
-                    self.rating_pristine = false;
+                    self.clear_rating_input_on_edit = false;
                 }
                 if self.rating_input.len() < 6 {
                     self.rating_input.push(ch);
@@ -1605,7 +1577,7 @@ impl AppState {
             Some(next) => self.rating_input = format.format_input_initial(Some(next)),
             None => self.rating_input.clear(),
         }
-        self.rating_pristine = false;
+        self.clear_rating_input_on_edit = false;
         self.rating_input_error = None;
     }
 
@@ -1720,7 +1692,7 @@ impl AppState {
             .progress_rollback_base
             .entry(media_id)
             .or_insert(current);
-        let seq = self.next_seq();
+        let seq = self.next_mutation_seq();
         self.active_mutations.insert(media_id, seq);
 
         vec![AppCommand::ScheduleProgress {
@@ -1757,11 +1729,11 @@ impl AppState {
             else {
                 return Vec::new();
             };
-            if let Some(base_prog) = self.progress_rollback_base.remove(&media_id) {
-                removed_item.entry.progress = base_prog;
+            if let Some(base_progress) = self.progress_rollback_base.remove(&media_id) {
+                removed_item.entry.progress = base_progress;
             }
 
-            let seq = self.next_seq();
+            let seq = self.next_mutation_seq();
             self.active_mutations.insert(media_id, seq);
             self.description_scroll = 0;
             self.rebuild_visible_rows();
@@ -1794,13 +1766,13 @@ impl AppState {
             .position(|entry| entry.id == media_id)
             .unwrap_or(idx);
         let mut previous_entry = current_entry;
-        if let Some(base_prog) = self.progress_rollback_base.remove(&media_id) {
-            previous_entry.progress = base_prog;
+        if let Some(base_progress) = self.progress_rollback_base.remove(&media_id) {
+            previous_entry.progress = base_progress;
         }
 
         self.library
             .move_item(media_id, bucket_status, target_status);
-        let seq = self.next_seq();
+        let seq = self.next_mutation_seq();
         self.active_mutations.insert(media_id, seq);
         self.description_scroll = 0;
         self.rebuild_visible_rows();
@@ -1871,7 +1843,7 @@ impl AppState {
         item.entry.score = next_score;
 
         let previous_progress = self.progress_rollback_base.remove(&media_id);
-        let seq = self.next_seq();
+        let seq = self.next_mutation_seq();
         self.active_mutations.insert(media_id, seq);
 
         if self.sort_field == SortField::Score {
@@ -1918,8 +1890,8 @@ impl AppState {
             } => {
                 if let Some(item) = self.library.get_mut(media_id) {
                     item.entry.score = previous_score;
-                    if let Some(prev_prog) = previous_progress {
-                        item.entry.progress = prev_prog;
+                    if let Some(previous_progress) = previous_progress {
+                        item.entry.progress = previous_progress;
                     }
                 }
             }
@@ -1991,7 +1963,7 @@ impl AppState {
         }
     }
 
-    fn next_seq(&mut self) -> u64 {
+    fn next_mutation_seq(&mut self) -> u64 {
         self.next_mutation_seq = self.next_mutation_seq.wrapping_add(1);
         self.next_mutation_seq
     }
@@ -2061,7 +2033,7 @@ fn extract_access_token(input: &str) -> Option<String> {
         return None;
     }
     let candidate = match text.split_once("access_token=") {
-        Some((_, rest)) => rest.split(|c| c == '&' || c == '#').next().unwrap_or(rest),
+        Some((_, rest)) => rest.split(['&', '#']).next().unwrap_or(rest),
         None => text
             .strip_prefix("Bearer ")
             .or_else(|| text.strip_prefix("bearer "))
@@ -2103,7 +2075,6 @@ struct RuntimeContext {
     pending_progress: HashMap<MediaId, PendingProgress>,
 }
 
-/// Runs the interactive terminal event loop until the user quits.
 pub async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app_config: AppConfig,
@@ -2303,7 +2274,7 @@ fn draw_and_schedule_reencode<B: Backend>(
     if let Some((media_id, area)) = state.pending_reencode.take() {
         if area.width > 0 && area.height > 0 {
             if let Some(proto) = state.cover_cache.take(media_id) {
-                if state.cover_cache.mark_in_flight(media_id) {
+                if state.cover_cache.try_mark_in_flight(media_id) {
                     CoverLoader::reencode_cover(media_id, proto, area, ctx.cover_tx.clone());
                 } else {
                     state.cover_cache.insert(media_id, proto);
@@ -2398,14 +2369,14 @@ fn execute_commands(
                 status,
                 rollback,
             } => {
-                let pending_prog = ctx.pending_progress.remove(&media_id).map(|p| p.progress);
+                let pending_progress = ctx.pending_progress.remove(&media_id).map(|p| p.progress);
                 spawn_save_entry(
                     state,
                     ctx,
                     current_epoch,
                     media_id,
                     Some(status),
-                    pending_prog,
+                    pending_progress,
                     None,
                     rollback,
                 );
@@ -2415,14 +2386,14 @@ fn execute_commands(
                 score,
                 rollback,
             } => {
-                let pending_prog = ctx.pending_progress.remove(&media_id).map(|p| p.progress);
+                let pending_progress = ctx.pending_progress.remove(&media_id).map(|p| p.progress);
                 spawn_save_entry(
                     state,
                     ctx,
                     current_epoch,
                     media_id,
                     None,
-                    pending_prog,
+                    pending_progress,
                     Some(score),
                     rollback,
                 );
@@ -2492,7 +2463,7 @@ fn execute_commands(
                     // Touch cached entries so the visible window stays hot in LRU, then
                     // enqueue uncached covers only once via CoverCache deduplication.
                     if state.cover_cache.get_mut(media_id).is_none()
-                        && state.cover_cache.mark_in_flight(media_id)
+                        && state.cover_cache.try_mark_in_flight(media_id)
                     {
                         ctx.cover_loader
                             .request_cover(media_id, url, area, ctx.cover_tx.clone());
@@ -3432,7 +3403,6 @@ mod tests {
         }
         let mut state = authenticated_state(lib);
 
-        // Pane cycling: Table -> Details -> Sidebar -> Table.
         assert_eq!(state.focus, FocusPane::Table);
         state.handle_key(key(KeyCode::Tab));
         assert_eq!(state.focus, FocusPane::Details);
@@ -3443,14 +3413,12 @@ mod tests {
         state.handle_key(key(KeyCode::BackTab));
         assert_eq!(state.focus, FocusPane::Table);
 
-        // Help modal blocks background shortcuts and toggles cleanly.
         state.handle_key(key(KeyCode::Char('?')));
         assert_eq!(state.modal, ActiveModal::Help);
         assert!(state.handle_key(key(KeyCode::Char('+'))).is_empty());
         state.handle_key(key(KeyCode::Char('?')));
         assert_eq!(state.modal, ActiveModal::None);
 
-        // Description scroll via J/K/PageDown/PageUp and resetting on row move.
         state.handle_key(key(KeyCode::Char('J')));
         assert_eq!(state.description_scroll, 1);
         state.handle_key(key(KeyCode::PageDown));
@@ -3460,7 +3428,6 @@ mod tests {
         state.handle_key(key(KeyCode::PageUp));
         assert_eq!(state.description_scroll, 0);
 
-        // v opens site_url when available, warns when missing.
         let open_cmds = state.handle_key(key(KeyCode::Char('v')));
         assert!(matches!(
             open_cmds.as_slice(),
@@ -3472,7 +3439,6 @@ mod tests {
         assert!(missing_cmds.is_empty());
         assert_eq!(state.active_toast().unwrap().level, ToastLevel::Warning);
 
-        // R triggers FetchLibrary and deduplicates while a sync is already in-flight.
         let refresh_cmds = state.handle_key(key(KeyCode::Char('R')));
         assert!(state.syncing);
         assert_eq!(refresh_cmds, vec![AppCommand::FetchLibrary]);
@@ -3481,7 +3447,6 @@ mod tests {
         assert!(state.syncing);
         assert!(dup_refresh_cmds.is_empty());
 
-        // 401 unauthorized redirects to Auth screen preserving client_id and clears prior library.
         let old_epoch = state.session_epoch();
         let auth_cmds = state.apply_event(AppEvent::LibraryLoadFailed {
             epoch: old_epoch,
@@ -3510,7 +3475,6 @@ mod tests {
         let mut state = authenticated_state(sample_library());
         let old_epoch = state.session_epoch();
 
-        // Start a progress mutation in old session, then log out.
         let cmds = state.handle_key(key(KeyCode::Char('+')));
         let old_rollback = match cmds.as_slice() {
             [AppCommand::ScheduleProgress { rollback, .. }] => rollback.clone(),
@@ -3526,12 +3490,11 @@ mod tests {
         let auth_epoch = state.session_epoch();
         assert_ne!(auth_epoch, old_epoch);
 
-        // User starts typing new token on Auth screen.
         state.handle_key(key(KeyCode::Tab));
         state.handle_key(key(KeyCode::Tab));
         state.handle_key(key(KeyCode::Char('x')));
 
-        // Stale 401 from old session must NOT wipe the typed token or re-redirect.
+        // Stale 401 from old session must not wipe the typed token or re-redirect.
         let stale_err = state.apply_event(AppEvent::LibraryLoadFailed {
             epoch: old_epoch,
             error: "401".to_owned(),
@@ -3544,7 +3507,6 @@ mod tests {
             Screen::Auth(auth) if auth.token == "x" && auth.error.is_none()
         ));
 
-        // Stale LibraryLoaded from old session must NOT populate state while on Auth screen.
         let stale_load = state.apply_event(AppEvent::LibraryLoaded {
             epoch: old_epoch,
             library: sample_library(),
@@ -3553,7 +3515,6 @@ mod tests {
         assert!(stale_load.is_empty());
         assert!(state.library.is_empty());
 
-        // Sign in as a different user -> epoch advances again.
         state.apply_event(AppEvent::AuthSucceeded {
             client_id: "cid-new".to_owned(),
             token: "tok-new".to_owned(),
@@ -3564,7 +3525,6 @@ mod tests {
         assert_ne!(new_epoch, auth_epoch);
         assert!(state.library.is_empty());
 
-        // Stale SnapshotLoaded, EntrySaved, and MutationFailed from old_epoch are dropped.
         assert!(state
             .apply_event(AppEvent::SnapshotLoaded {
                 epoch: old_epoch,
@@ -3589,7 +3549,6 @@ mod tests {
             .is_empty());
         assert!(state.library.is_empty());
 
-        // Current epoch SnapshotLoaded works cleanly.
         let snap_cmds = state.apply_event(AppEvent::SnapshotLoaded {
             epoch: new_epoch,
             library: sample_library(),
@@ -3601,13 +3560,11 @@ mod tests {
     #[test]
     fn sort_picker_and_reverse_toggle_reorder_visible_rows_and_persist_config() {
         let mut state = authenticated_state(sample_library());
-        // sample_library() Watching list has [Frieren (id 1), Cowboy Bebop (id 2)].
         assert_eq!(state.visible_items()[0].id, media_id(1));
         assert_eq!(state.visible_items()[1].id, media_id(2));
         assert_eq!(state.sort_field, SortField::Updated);
         assert_eq!(state.sort_direction, SortDirection::Desc);
 
-        // Open Sort By modal with `s`, move down to Title, and apply with Enter.
         state.handle_key(key(KeyCode::Char('s')));
         assert_eq!(state.modal, ActiveModal::SortPicker { selected: 0 });
         state.handle_key(key(KeyCode::Char('j')));
@@ -3616,7 +3573,7 @@ mod tests {
         assert_eq!(state.modal, ActiveModal::None);
         assert_eq!(state.sort_field, SortField::Title);
         assert_eq!(state.sort_direction, SortDirection::Asc);
-        // Cowboy Bebop < Frieren alphabetically, and previous selection (Frieren) is preserved.
+        // Dandadan (id 2) < Frieren (id 1) alphabetically; previous selection (id 1) is preserved.
         assert_eq!(state.visible_items()[0].id, media_id(2));
         assert_eq!(state.visible_items()[1].id, media_id(1));
         assert_eq!(state.selected_item().map(|i| i.id), Some(media_id(1)));
@@ -3626,7 +3583,6 @@ mod tests {
                 if cfg.sort_by == SortField::Title && cfg.sort_order == SortDirection::Asc
         )));
 
-        // Press `S` to reverse direction to Title Desc -> Frieren first again.
         let rev_cmds = state.handle_key(key(KeyCode::Char('S')));
         assert_eq!(state.sort_field, SortField::Title);
         assert_eq!(state.sort_direction, SortDirection::Desc);
