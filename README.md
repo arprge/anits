@@ -67,13 +67,13 @@ cargo install --path . --locked
 | `J` / `K` or `PgDn` / `PgUp` | Scroll anime synopsis                                               |
 | `g` / `G`                    | Jump to top / bottom                                                |
 | `/`                          | Filter library (`Ctrl+A` toggles `Current List` / `All Lists`)      |
-| `s` / `S`                    | Open **Sort By** picker / reverse sort order (`↑` / `↓`)            |
+| `s` / `S`                    | Open "Sort By" picker / reverse sort order (`↑` / `↓`)            |
 | `+` / `i`, `-` / `d`         | Increment / decrement watched episodes (debounced)                  |
 | `a`                          | Move entry to another collection or remove from library             |
 | `r`                          | Rate anime or clear rating                                          |
 | `v`                          | Open anime page on AniList in browser                               |
 | `R`                          | Refresh library from AniList                                        |
-| `?`                          | Open **Help & Settings** (`t` cycle theme, `s` cycle rating system) |
+| `?`                          | Open "Help & Settings" (`t` cycle theme, `s` cycle rating system) |
 | `q` / `Ctrl+C`               | Quit                                                                |
 
 ## Configuration
