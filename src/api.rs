@@ -15,7 +15,6 @@ use crate::domain::{
     ScoreRaw, ScoreUpdate, clean_description,
 };
 
-/// Official AniList GraphQL endpoint.
 pub const ANILIST_GRAPHQL_URL: &str = "https://graphql.anilist.co";
 
 const DEFAULT_PER_CHUNK: u32 = 500;
@@ -100,7 +99,6 @@ mutation ($id: Int!) {
 }
 "#;
 
-/// Snapshot of AniList HTTP rate-limit headers from the latest response.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RateLimitInfo {
     pub limit: Option<u32>,
@@ -114,7 +112,6 @@ struct RateLimitTracker {
     blocked_until: Option<Instant>,
 }
 
-/// Errors returned by [`AnilistClient`].
 #[derive(Debug, Error)]
 pub enum AnilistError {
     #[error("HTTP request failed: {0}")]
@@ -134,19 +131,16 @@ pub enum AnilistError {
 }
 
 impl AnilistError {
-    /// Returns `true` when AniList rejected authentication credentials.
     #[must_use]
     pub const fn is_auth_error(&self) -> bool {
         matches!(self, Self::Unauthorized)
     }
 
-    /// Returns `true` when the request was throttled by AniList's rate limit.
     #[must_use]
     pub const fn is_rate_limited(&self) -> bool {
         matches!(self, Self::RateLimited { .. })
     }
 
-    /// Returns `true` for transient transport or gateway errors safe to retry on read-only queries.
     #[must_use]
     pub fn is_transient(&self) -> bool {
         match self {
@@ -159,7 +153,6 @@ impl AnilistError {
     }
 }
 
-/// Persistent, connection-pooled AniList GraphQL client.
 #[derive(Debug, Clone)]
 pub struct AnilistClient {
     http: reqwest::Client,
@@ -168,7 +161,6 @@ pub struct AnilistClient {
 }
 
 impl AnilistClient {
-    /// Creates a new [`AnilistClient`] with HTTP/2 connection pooling, user-agent, and timeouts.
     pub fn new() -> Result<Self, AnilistError> {
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -197,13 +189,11 @@ impl AnilistClient {
         Ok(client)
     }
 
-    /// Returns a reference to the underlying pooled `reqwest::Client` for cover downloads.
     #[must_use]
     pub fn http(&self) -> &reqwest::Client {
         &self.http
     }
 
-    /// Returns the most recently observed AniList rate-limit window metadata.
     #[must_use]
     pub fn rate_limit_info(&self) -> RateLimitInfo {
         self.rate_limit
@@ -212,7 +202,6 @@ impl AnilistClient {
             .info
     }
 
-    /// Fetches the authenticated user's AniList username via `Viewer`.
     pub async fn fetch_viewer_name(&self, token: &str) -> Result<String, AnilistError> {
         #[derive(Deserialize)]
         struct ViewerData {
@@ -225,14 +214,13 @@ impl AnilistClient {
         }
 
         let data: ViewerData = self
-            .post_graphql_read(VIEWER_QUERY, serde_json::json!({}), Some(token))
+            .post_graphql_with_retry(VIEWER_QUERY, serde_json::json!({}), Some(token))
             .await?;
         data.viewer
             .map(|v| v.name)
             .ok_or(AnilistError::MissingData)
     }
 
-    /// Fetches all 6 personal library lists for `username`, paginating chunks when needed.
     pub async fn fetch_full_library(
         &self,
         username: &str,
@@ -252,7 +240,7 @@ impl AnilistClient {
                 "perChunk": DEFAULT_PER_CHUNK,
             });
             let data: FullLibraryData = self
-                .post_graphql_read(FULL_LIBRARY_QUERY, vars, token)
+                .post_graphql_with_retry(FULL_LIBRARY_QUERY, vars, token)
                 .await?;
             let has_next =
                 merge_library_chunk(data, &mut grouped, &mut seen_ids, &mut score_format);
@@ -264,7 +252,6 @@ impl AnilistClient {
         Ok(LibraryCollection::from_array(grouped, score_format))
     }
 
-    /// Updates status, progress, and/or score for a library entry via `SaveMediaListEntry`.
     pub async fn save_entry(
         &self,
         token: &str,
@@ -300,7 +287,6 @@ impl AnilistClient {
         })
     }
 
-    /// Deletes a library entry by its `EntryId` (`MediaList.id`).
     pub async fn delete_entry(
         &self,
         token: &str,
@@ -323,7 +309,7 @@ impl AnilistClient {
         Ok(data.deleted.is_some_and(|d| d.deleted))
     }
 
-    async fn post_graphql_read<V: Serialize + Clone, D: for<'de> Deserialize<'de>>(
+    async fn post_graphql_with_retry<V: Serialize + Clone, D: for<'de> Deserialize<'de>>(
         &self,
         query: &str,
         variables: V,
@@ -331,7 +317,7 @@ impl AnilistClient {
     ) -> Result<D, AnilistError> {
         match self.post_graphql(query, variables.clone(), token).await {
             Ok(data) => Ok(data),
-            Err(err) if err.is_transient() && self.check_backoff().is_none() => {
+            Err(err) if err.is_transient() && self.remaining_backoff_secs().is_none() => {
                 tokio::time::sleep(READ_RETRY_DELAY).await;
                 self.post_graphql(query, variables, token).await
             }
@@ -351,7 +337,7 @@ impl AnilistClient {
             variables: V,
         }
 
-        if let Some(retry_after_secs) = self.check_backoff() {
+        if let Some(retry_after_secs) = self.remaining_backoff_secs() {
             return Err(AnilistError::RateLimited { retry_after_secs });
         }
 
@@ -407,7 +393,7 @@ impl AnilistClient {
         envelope.data.ok_or(AnilistError::MissingData)
     }
 
-    fn check_backoff(&self) -> Option<u64> {
+    fn remaining_backoff_secs(&self) -> Option<u64> {
         let now = Instant::now();
         let mut tracker = self.rate_limit.lock().unwrap_or_else(|e| e.into_inner());
         let until = tracker.blocked_until?;
